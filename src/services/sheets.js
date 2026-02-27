@@ -19,7 +19,8 @@ async function getSheetsClient() {
 
   let credentials;
   try {
-    credentials = JSON.parse(config.google.serviceAccountJson.replace(/\\n/g, '\n'));
+    const raw = Buffer.from(config.google.serviceAccountJson, 'base64').toString('utf8');
+    credentials = JSON.parse(raw);
   } catch (err) {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido.');
   }
