@@ -43,9 +43,14 @@ app.post(config.telegram.webhookPath, handleTelegramWebhook);
 // INICIAR SERVIDOR
 // ─────────────────────────────────────────────────────────────
 const PORT = config.port;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`[SERVER] ✅ Bot financiero corriendo en puerto ${PORT}`);
   console.log(`[SERVER] Webhook Telegram: POST /webhook/telegram`);
+});
+
+process.on('SIGTERM', () => {
+  console.log('[SERVER] SIGTERM recibido, cerrando...');
+  process.exit(0);
 });
 
 export default app;
