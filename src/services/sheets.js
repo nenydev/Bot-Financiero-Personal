@@ -52,6 +52,9 @@ export async function appendMovement(data) {
   const row = [fecha, tipo, monto, detalle];
 
   try {
+    console.log('[DEBUG] SpreadsheetId:', config.google.spreadsheetId);
+    console.log('[DEBUG] SheetName:', config.google.sheetName);
+    console.log('[DEBUG] Llamando a Sheets API...');
     await sheets.spreadsheets.values.append({
       spreadsheetId: config.google.spreadsheetId,
       range: `${config.google.sheetName}!A:D`,
@@ -64,7 +67,7 @@ export async function appendMovement(data) {
 
     console.log(`[SHEETS] ✅ Movimiento guardado: ${tipo} ${monto} el ${fecha}`);
   } catch (err) {
-    console.error('[SHEETS] ❌ Error al escribir en Google Sheets:', err.message);
+    console.error('[SHEETS] Error completo:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     throw new Error('No se pudo guardar el movimiento en Google Sheets.');
   }
 }
