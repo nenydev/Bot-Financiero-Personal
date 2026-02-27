@@ -33,8 +33,10 @@ async function getSheetsClient() {
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
+  console.log('[DEBUG] Auth creado, obteniendo cliente Sheets...');
 
   sheetsClient = google.sheets({ version: 'v4', auth });
+  console.log('[DEBUG] Cliente Sheets listo');
   return sheetsClient;
 }
 
