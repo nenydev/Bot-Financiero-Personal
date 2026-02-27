@@ -20,9 +20,8 @@ async function getSheetsClient() {
   let credentials;
   try {
     console.log('[DEBUG] Primeros 50 chars del JSON env:', config.google.serviceAccountJson?.substring(0, 50));
-    const raw = Buffer.from(config.google.serviceAccountJson, 'base64').toString('utf8');
     console.log('[DEBUG] JSON decodificado, primeros 20 chars:', raw.substring(0, 20));
-    credentials = JSON.parse(raw);
+    credentials = JSON.parse(config.google.serviceAccountJson.replace(/\\n/g, '\n'))
     console.log('[DEBUG] Credenciales parseadas, client_email:', credentials.client_email);
     console.log('[DEBUG] Private key empieza con:', credentials.private_key?.substring(0, 40));
   } catch (err) {
