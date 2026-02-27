@@ -78,6 +78,7 @@ export async function handleTelegramWebhook(req, res) {
 
   // 2. Parsear el mensaje (lógica 100% independiente de Telegram)
   const parsed = parseMessage(text);
+  console.log('[DEBUG] Resultado del parser:', JSON.stringify(parsed)); 
 
   if (!parsed.success) {
     console.log(`[TELEGRAM] Parse fallido para "${text}": ${parsed.error}`);
@@ -86,10 +87,13 @@ export async function handleTelegramWebhook(req, res) {
   }
 
   // 3. Guardar en Google Sheets
+  console.log('[DEBUG] Intentando guardar en Sheets...');
   try {
     await appendMovement(parsed);
+    console.log('[DEBUG] Guardado exitoso'); 
   } catch (err) {
     console.error('[TELEGRAM] Error guardando movimiento:', err.message);
+    console.error('[TELEGRAM] Stack:', err.stack); // NUEVO
     await sendReply(chatId, '❌ Error al guardar el movimiento. Intenta más tarde.');
     return;
   }
