@@ -23,6 +23,8 @@ async function getSheetsClient() {
     const raw = Buffer.from(config.google.serviceAccountJson, 'base64').toString('utf8');
     console.log('[DEBUG] JSON decodificado, primeros 20 chars:', raw.substring(0, 20));
     credentials = JSON.parse(raw);
+    console.log('[DEBUG] Credenciales parseadas, client_email:', credentials.client_email);
+    console.log('[DEBUG] Private key empieza con:', credentials.private_key?.substring(0, 40));
   } catch (err) {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido.');
   }
