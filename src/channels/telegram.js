@@ -21,7 +21,6 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-import fetch from 'node-fetch';
 import { WHITELIST, config } from '../config.js';
 import { parseMessage } from '../core/parser.js';
 import { appendMovement } from '../services/sheets.js';
