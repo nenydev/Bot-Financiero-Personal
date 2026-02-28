@@ -35,8 +35,8 @@ export function parseAmount(text) {
     return base * 1000;
   }
 
-  // Patrón: número seguido de "lucas" → ej: 20 lucas, 20lucas
-  const lucasPattern = /(\d+(?:[.,]\d{3})?)\s*lucas?\b/i;
+  // Patrón: número seguido de "lucas" o "lukas" → ej: 20 lucas, 20 lukas
+  const lucasPattern = /(\d+(?:[.,]\d{3})?)\s*luk?as?\b/i;
   const lucasMatch = lower.match(lucasPattern);
   if (lucasMatch) {
     const base = normalizeNumber(lucasMatch[1]);
