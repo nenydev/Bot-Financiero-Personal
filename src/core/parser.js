@@ -52,7 +52,7 @@ export function parseMessage(text) {
   const detalle = text.trim();
 
   // 5. Detectar medio de pago (opcional)
-  const medioPago = parsePayment(rawText);
+  const medioPago = parsePayment(text);
 
   
 
