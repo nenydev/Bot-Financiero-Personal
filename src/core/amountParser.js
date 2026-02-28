@@ -20,7 +20,7 @@ export function parseAmount(text) {
   const lower = text.toLowerCase().trim();
 
   // Patrón: número seguido de "k" → ej: 20k, 20K
-  const kPattern = /(\d+(?:[.,]\d{3})?)\s*k\b/i;
+  const kPattern = /\b(\d+(?:[.,]\d{3})?)\s*k\b/i;
   const kMatch = lower.match(kPattern);
   if (kMatch) {
     const base = normalizeNumber(kMatch[1]);
@@ -28,7 +28,7 @@ export function parseAmount(text) {
   }
 
   // Patrón: número seguido de "mil" → ej: 20 mil, 20mil
-  const milPattern = /(\d+(?:[.,]\d{3})?)\s*mil\b/i;
+  const milPattern = /\b(\d+(?:[.,]\d{3})?)\s*mil\b/i;
   const milMatch = lower.match(milPattern);
   if (milMatch) {
     const base = normalizeNumber(milMatch[1]);
@@ -36,7 +36,7 @@ export function parseAmount(text) {
   }
 
   // Patrón: número seguido de "lucas" o "lukas" → ej: 20 lucas, 20 lukas
-  const lucasPattern = /(\d+(?:[.,]\d{3})?)\s*luk?as?\b/i;
+  const lucasPattern = /\b(\d+(?:[.,]\d{3})?)\s*luk?as?\b/i;
   const lucasMatch = lower.match(lucasPattern);
   if (lucasMatch) {
     const base = normalizeNumber(lucasMatch[1]);
@@ -52,7 +52,7 @@ export function parseAmount(text) {
   }
 
   // Patrón: número entero simple → ej: 20000
-  const plainPattern = /\b(\d{3,})\b/;
+  const plainPattern = /\b(\d+)\b/;
   const plainMatch = text.match(plainPattern);
   if (plainMatch) {
     return parseInt(plainMatch[1], 10);
