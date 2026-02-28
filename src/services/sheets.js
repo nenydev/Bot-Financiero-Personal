@@ -9,11 +9,6 @@ import { config } from '../config.js';
 
 let sheetsClient = null;
 
-/**
- * Inicializa y retorna el cliente autenticado de Google Sheets.
- * Usa lazy initialization para no reconectar en cada request.
- * @returns {import('googleapis').sheets_v4.Sheets}
- */
 async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
@@ -38,8 +33,6 @@ async function getSheetsClient() {
 
 /**
  * Agrega una fila con el movimiento financiero al Google Sheet.
- * @param {{ fecha: string, tipo: string, monto: number, detalle: string }} data
- * @returns {Promise<void>}
  */
 export async function appendMovement(data) {
   const sheets = await getSheetsClient();
@@ -57,7 +50,6 @@ export async function appendMovement(data) {
         values: [row],
       },
     });
-
   } catch (err) {
     throw new Error('No se pudo guardar el movimiento en Google Sheets.');
   }
@@ -65,22 +57,91 @@ export async function appendMovement(data) {
 
 /**
  * Lee todos los movimientos del Sheet.
- * @returns {Promise<Array>}
  */
 export async function getMovimientos() {
   const sheets = await getSheetsClient();
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.google.spreadsheetId,
-    range: `${config.google.sheetName}!A2:D`,
+    range: `${config.google.sheetName}!A2:E`,
   });
 
   const rows = res.data.values || [];
 
   return rows.map((row) => ({
     fecha: row[0] || '',
-    tipo: row[1] || '',
-    monto: parseInt(row[2], 10) || 0,
-    detalle: row[3] || '',
+    medioPago: row[1] || '',
+    tipo: row[2] || '',
+    monto: parseInt(row[3], 10) || 0,
+    detalle: row[4] || '',
   }));
+}
+
+/**
+ * Elimina un movimiento del Sheet buscándolo por sus valores.
+ * @param {{ fecha: string, tipo: string, monto: number, detalle: string }} movimiento
+ */
+export async function deleteMovimiento(movimiento) {
+  const sheets = await getSheetsClient();
+
+  // Obtener todas las filas para encontrar el índice exacto
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.google.spreadsheetId,
+    range: `${config.google.sheetName}!A:E`,
+  });
+
+  const rows = res.data.values || [];
+
+  // Buscar la fila que coincida con el movimiento (de abajo hacia arriba)
+  let rowIndex = -1;
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const row = rows[i];
+    const fechaMatch = (row[0] || '').replace("'", '') === movimiento.fecha.replace("'", '');
+    const tipoMatch = (row[2] || '') === movimiento.tipo;
+    const montoMatch = parseInt(row[3], 10) === movimiento.monto;
+    const detalleMatch = (row[4] || '') === movimiento.detalle;
+
+    if (fechaMatch && tipoMatch && montoMatch && detalleMatch) {
+      rowIndex = i;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw new Error('No se encontró el movimiento en el Sheet.');
+  }
+
+  // Obtener el sheetId
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId: config.google.spreadsheetId,
+  });
+
+  const sheetId = spreadsheet.data.sheets.find(
+    (s) => s.properties.title === config.google.sheetName
+  )?.properties.sheetId;
+
+  if (sheetId === undefined) {
+    throw new Error('No se encontró la hoja en el Spreadsheet.');
+  }
+
+  // Eliminar la fila
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: config.google.spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: rowIndex,
+              endIndex: rowIndex + 1,
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  console.log(`[SHEETS] ✅ Movimiento eliminado en fila ${rowIndex + 1}`);
 }

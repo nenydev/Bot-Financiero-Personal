@@ -1,39 +1,25 @@
 /**
  * telegram.js
  * Responsabilidad: manejar la comunicación con la API de Telegram.
- *
- * Esta capa solo:
- *  1. Extrae el mensaje y usuario del payload de Telegram.
- *  2. Valida el usuario contra la whitelist.
- *  3. Llama al parser (lógica de negocio independiente).
- *  4. Llama al servicio de Sheets.
- *  5. Responde al usuario via Telegram.
- *
- * NO contiene lógica de parseo ni lógica de negocio.
- *
- * ─────────────────────────────────────────────────────────────
- * MIGRACIÓN A WHATSAPP (futuro):
- *  Crear /src/channels/whatsapp.js siguiendo la misma estructura:
- *  - Extraer `userId` de `req.body.entry[0].changes[0].value.messages[0].from`
- *  - Extraer `text` de `...messages[0].text.body`
- *  - Usar la misma función `sendReply(userId, text)` pero con la API de WhatsApp Cloud
- *  - El parser y el servicio de Sheets NO cambian.
- * ─────────────────────────────────────────────────────────────
  */
 
 import { WHITELIST, config } from '../config.js';
 import { parseMessage } from '../core/parser.js';
-import { appendMovement, getMovimientos } from '../services/sheets.js';
-import { generarResumen, generarUltimosMovimientos, getRango } from '../core/resumen.js';
+import { appendMovement, getMovimientos, deleteMovimiento } from '../services/sheets.js';
+import {
+  generarResumen,
+  generarResumenHistorico,
+  generarResumenHoy,
+  generarBalance,
+  generarUltimosMovimientos,
+  getRango,
+} from '../core/resumen.js';
 
-// Estado temporal de conversaciones (se resetea si el servidor reinicia)
+// Estado temporal de conversaciones
 const conversationState = new Map();
 
 const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
-/**
- * Envía un mensaje de texto a un chat de Telegram.
- */
 async function sendReply(chatId, text) {
   try {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -46,24 +32,16 @@ async function sendReply(chatId, text) {
   }
 }
 
-/**
- * Procesa un webhook de Telegram.
- */
 export async function handleTelegramWebhook(req, res) {
-  // Responder 200 inmediatamente para que Telegram no reintente
   res.sendStatus(200);
 
   const body = req.body;
-
   const message = body?.message;
-  if (!message || !message.text) {
-    console.log('[TELEGRAM] Update sin texto, ignorando.');
-    return;
-  }
+  if (!message || !message.text) return;
 
   const userId = message.from?.id;
   const chatId = message.chat?.id;
-  const text = message.text;
+  const text = message.text.trim();
   const username = message.from?.username || message.from?.first_name || userId;
 
   console.log(`[TELEGRAM] Mensaje de ${username} (${userId}): "${text}"`);
@@ -77,47 +55,31 @@ export async function handleTelegramWebhook(req, res) {
 
   // 2. Detectar comandos
   if (text.startsWith('/')) {
-    await handleCommand(chatId, userId, text.toLowerCase().trim());
+    await handleCommand(chatId, userId, text.toLowerCase());
     return;
   }
 
-  // 3. Manejar respuesta de período si el usuario está en medio de un /resumen
-  if (conversationState.get(userId) === 'esperando_periodo') {
-    const opciones = {
-      '1': 'semanal', '2': 'mensual', '3': 'trimestral', '4': 'semestral', '5': 'anual',
-      'semanal': 'semanal', 'mensual': 'mensual', 'trimestral': 'trimestral',
-      'semestral': 'semestral', 'anual': 'anual',
-    };
+  // 3. Manejar estados de conversación activos
+  const estado = conversationState.get(userId);
 
-    const periodo = opciones[text.toLowerCase().trim()];
-
-    if (periodo) {
-      conversationState.delete(userId);
-      try {
-        const movimientos = await getMovimientos();
-        const rango = getRango(periodo);
-        const respuesta = generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta);
-        await sendReply(chatId, respuesta);
-      } catch (err) {
-        console.error('[TELEGRAM] Error generando resumen:', err.message);
-        await sendReply(chatId, '❌ Error al generar el resumen.');
-      }
-    } else {
-      await sendReply(chatId, 'Responde con un número del 1 al 5 o escribe el período (semanal, mensual, trimestral, semestral, anual).');
-    }
+  if (estado === 'borrar_seleccion') {
+    await handleBorrarSeleccion(chatId, userId, text);
     return;
   }
 
-  // 4. Parsear el mensaje financiero
+  if (estado?.startsWith('borrar_confirmar:')) {
+    await handleBorrarConfirmacion(chatId, userId, text, estado);
+    return;
+  }
+
+  // 4. Parsear mensaje financiero
   const parsed = parseMessage(text);
 
   if (!parsed.success) {
-    console.log(`[TELEGRAM] Parse fallido para "${text}": ${parsed.error}`);
     await sendReply(chatId, `❌ ${parsed.error}`);
     return;
   }
 
-  // 5. Guardar en Google Sheets
   try {
     await appendMovement(parsed);
   } catch (err) {
@@ -126,64 +88,202 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  // 6. Confirmar al usuario
-  const reply = `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha} — ${parsed.medioPago}`;
-  await sendReply(chatId, reply);
+  await sendReply(chatId, `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha} — ${parsed.medioPago}`);
 }
 
-/**
- * Maneja comandos que empiezan con /
- */
 async function handleCommand(chatId, userId, text) {
-  // /movimientos
-  if (text === '/movimientos') {
+
+  // /ayuda
+  if (text === '/ayuda') {
+    await sendReply(chatId,
+      '🤖 Comandos disponibles:\n\n' +
+      '📊 Resúmenes:\n' +
+      '/hoy — movimientos de hoy\n' +
+      '/semanal — últimos 7 días\n' +
+      '/mensual — mes actual\n' +
+      '/trimestral — últimos 3 meses\n' +
+      '/semestral — últimos 6 meses\n' +
+      '/anual — año actual\n' +
+      '/historico — todos los movimientos\n\n' +
+      '💳 Consultas:\n' +
+      '/balance — balance del mes actual\n' +
+      '/movimientos — últimos 10 movimientos\n' +
+      '/ultimo — último movimiento registrado\n\n' +
+      '🗑️ Eliminar:\n' +
+      '/borrar — eliminar un movimiento\n\n' +
+      '📝 Para registrar un movimiento escribe en lenguaje natural:\n' +
+      '"gasté 20 lucas en supermercado"\n' +
+      '"me transfirieron 150k de sueldo"\n' +
+      '"pagué 45.000 con tarjeta ayer"'
+    );
+    return;
+  }
+
+  // /hoy
+  if (text === '/hoy') {
     try {
       const movimientos = await getMovimientos();
-      const respuesta = generarUltimosMovimientos(movimientos, 10);
-      await sendReply(chatId, respuesta);
-    } catch (err) {
-      console.error('[TELEGRAM] Error obteniendo movimientos:', err.message);
+      await sendReply(chatId, generarResumenHoy(movimientos));
+    } catch {
       await sendReply(chatId, '❌ Error al obtener los movimientos.');
     }
     return;
   }
 
-  // /resumen con período directo: /resumen mensual
-  const matchDirecto = text.match(/^\/resumen\s+(semanal|mensual|trimestral|semestral|anual)$/);
-  if (matchDirecto) {
+  // /balance
+  if (text === '/balance') {
     try {
-      const periodo = matchDirecto[1];
+      const movimientos = await getMovimientos();
+      await sendReply(chatId, generarBalance(movimientos));
+    } catch {
+      await sendReply(chatId, '❌ Error al obtener el balance.');
+    }
+    return;
+  }
+
+  // /movimientos
+  if (text === '/movimientos') {
+    try {
+      const movimientos = await getMovimientos();
+      await sendReply(chatId, generarUltimosMovimientos(movimientos, 10));
+    } catch {
+      await sendReply(chatId, '❌ Error al obtener los movimientos.');
+    }
+    return;
+  }
+
+  // /ultimo
+  if (text === '/ultimo') {
+    try {
+      const movimientos = await getMovimientos();
+      if (movimientos.length === 0) {
+        await sendReply(chatId, '📋 No hay movimientos registrados.');
+        return;
+      }
+      const ultimo = movimientos[movimientos.length - 1];
+      await sendReply(
+        chatId,
+        `📋 Último movimiento:\n\n` +
+        `• ${ultimo.fecha.replace("'", '')} — ${ultimo.tipo} $${ultimo.monto.toLocaleString('es-CL')}\n` +
+        `  ${ultimo.detalle}\n` +
+        `  Medio de pago: ${ultimo.medioPago}`
+      );
+    } catch {
+      await sendReply(chatId, '❌ Error al obtener el último movimiento.');
+    }
+    return;
+  }
+
+  // /historico
+  if (text === '/historico') {
+    try {
+      const movimientos = await getMovimientos();
+      await sendReply(chatId, generarResumenHistorico(movimientos));
+    } catch {
+      await sendReply(chatId, '❌ Error al obtener el historial.');
+    }
+    return;
+  }
+
+  // Resúmenes por período
+  const periodos = ['semanal', 'mensual', 'trimestral', 'semestral', 'anual'];
+  const periodo = periodos.find((p) => text === `/${p}`);
+  if (periodo) {
+    try {
       const movimientos = await getMovimientos();
       const rango = getRango(periodo);
-      const respuesta = generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta);
-      await sendReply(chatId, respuesta);
-    } catch (err) {
-      console.error('[TELEGRAM] Error generando resumen:', err.message);
+      await sendReply(chatId, generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta));
+    } catch {
       await sendReply(chatId, '❌ Error al generar el resumen.');
     }
     return;
   }
 
-  // /resumen sin período → preguntar
-  if (text === '/resumen') {
-    conversationState.set(userId, 'esperando_periodo');
-    await sendReply(
-      chatId,
-      '¿Qué período quieres consultar?\n\n' +
-      '1️⃣ Semanal\n' +
-      '2️⃣ Mensual\n' +
-      '3️⃣ Trimestral\n' +
-      '4️⃣ Semestral\n' +
-      '5️⃣ Anual'
-    );
+  // /borrar
+  if (text === '/borrar') {
+    try {
+      const movimientos = await getMovimientos();
+      if (movimientos.length === 0) {
+        await sendReply(chatId, '📋 No hay movimientos para eliminar.');
+        return;
+      }
+
+      const ultimos3 = movimientos.slice(-3).reverse();
+      conversationState.set(userId, 'borrar_seleccion');
+      // Guardamos los últimos 3 para referencia
+      conversationState.set(`${userId}_borrar_lista`, ultimos3);
+
+      const lista = ultimos3
+        .map((m, i) => `${i + 1}. ${m.fecha.replace("'", '')} — ${m.tipo} $${m.monto.toLocaleString('es-CL')} — ${m.detalle}`)
+        .join('\n');
+
+      await sendReply(chatId, `🗑️ ¿Cuál movimiento quieres eliminar?\n\n${lista}\n\nResponde con el número (1, 2 o 3) o escribe /cancelar.`);
+    } catch {
+      await sendReply(chatId, '❌ Error al obtener los movimientos.');
+    }
+    return;
+  }
+
+  // /cancelar
+  if (text === '/cancelar') {
+    conversationState.delete(userId);
+    conversationState.delete(`${userId}_borrar_lista`);
+    await sendReply(chatId, '✅ Operación cancelada.');
     return;
   }
 
   // Comando no reconocido
+  await sendReply(chatId, '❓ Comando no reconocido. Escribe /ayuda para ver los comandos disponibles.');
+}
+
+async function handleBorrarSeleccion(chatId, userId, text) {
+  const lista = conversationState.get(`${userId}_borrar_lista`);
+  const opcion = parseInt(text.trim());
+
+  if (!lista || isNaN(opcion) || opcion < 1 || opcion > lista.length) {
+    await sendReply(chatId, `Responde con un número del 1 al ${lista?.length || 3} o escribe /cancelar.`);
+    return;
+  }
+
+  const movimiento = lista[opcion - 1];
+  conversationState.set(userId, `borrar_confirmar:${opcion - 1}`);
+
   await sendReply(
     chatId,
-    '❓ Comandos disponibles:\n\n' +
-    '/resumen — resumen financiero\n' +
-    '/movimientos — últimos 10 movimientos'
+    `⚠️ ¿Seguro que quieres eliminar este movimiento?\n\n` +
+    `• ${movimiento.fecha.replace("'", '')} — ${movimiento.tipo} $${movimiento.monto.toLocaleString('es-CL')}\n` +
+    `  ${movimiento.detalle}\n\n` +
+    `Responde "si" para confirmar o "no" para cancelar.`
   );
+}
+
+async function handleBorrarConfirmacion(chatId, userId, text, estado) {
+  const respuesta = text.toLowerCase().trim();
+
+  if (respuesta === 'no' || respuesta === '/cancelar') {
+    conversationState.delete(userId);
+    conversationState.delete(`${userId}_borrar_lista`);
+    await sendReply(chatId, '✅ Operación cancelada.');
+    return;
+  }
+
+  if (respuesta !== 'si' && respuesta !== 'sí') {
+    await sendReply(chatId, 'Responde "si" para confirmar o "no" para cancelar.');
+    return;
+  }
+
+  const indice = parseInt(estado.split(':')[1]);
+  const lista = conversationState.get(`${userId}_borrar_lista`);
+  const movimiento = lista[indice];
+
+  conversationState.delete(userId);
+  conversationState.delete(`${userId}_borrar_lista`);
+
+  try {
+    await deleteMovimiento(movimiento);
+    await sendReply(chatId, '✅ Movimiento eliminado correctamente.');
+  } catch (err) {
+    console.error('[TELEGRAM] Error eliminando movimiento:', err.message);
+    await sendReply(chatId, '❌ Error al eliminar el movimiento.');
+  }
 }

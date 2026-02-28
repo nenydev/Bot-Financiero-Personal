@@ -65,7 +65,7 @@ export function parsePayment(text) {
   }
 
   if (TARJETA_KEYWORDS.some((k) => normalized.includes(k))) {
-    return 'Tarjeta/Punto';
+    return 'Punto';
   }
 
   return 'No especificado';

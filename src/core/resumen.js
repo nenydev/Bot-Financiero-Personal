@@ -14,10 +14,6 @@ function ahoraChile() {
 
 /**
  * Filtra movimientos por rango de fechas.
- * @param {Array} movimientos
- * @param {Date} desde
- * @param {Date} hasta
- * @returns {Array}
  */
 function filtrarPorFecha(movimientos, desde, hasta) {
   return movimientos.filter((m) => {
@@ -57,7 +53,7 @@ function formatFecha(d) {
 }
 
 /**
- * Genera el texto del resumen.
+ * Genera el texto del resumen para un período.
  */
 export function generarResumen(movimientos, titulo, desde, hasta) {
   const filtrados = filtrarPorFecha(movimientos, desde, hasta);
@@ -81,6 +77,69 @@ export function generarResumen(movimientos, titulo, desde, hasta) {
 }
 
 /**
+ * Genera el resumen histórico completo.
+ */
+export function generarResumenHistorico(movimientos) {
+  if (movimientos.length === 0) return '📋 No hay movimientos registrados.';
+
+  const { ingresos, gastos, balance } = calcularTotales(movimientos);
+  const emoji = balance >= 0 ? '📈' : '📉';
+
+  const ultimos3 = movimientos.slice(-3).reverse();
+  const movimientosTexto = ultimos3
+    .map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`)
+    .join('\n');
+
+  return (
+    `📊 Resumen histórico (todos los movimientos)\n\n` +
+    `💰 Ingresos:  ${formatMonto(ingresos)}\n` +
+    `💸 Gastos:    ${formatMonto(gastos)}\n` +
+    `${emoji} Balance:   ${formatMonto(balance)}\n\n` +
+    `Últimos movimientos:\n${movimientosTexto}`
+  );
+}
+
+/**
+ * Genera el resumen del día de hoy.
+ */
+export function generarResumenHoy(movimientos) {
+  const hoy = ahoraChile();
+  const filtrados = filtrarPorFecha(movimientos, hoy, hoy);
+  const { ingresos, gastos, balance } = calcularTotales(filtrados);
+  const emoji = balance >= 0 ? '📈' : '📉';
+
+  const lista = filtrados.length > 0
+    ? filtrados.map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`).join('\n')
+    : '• Sin movimientos hoy';
+
+  return (
+    `📊 Resumen de hoy (${formatFecha(hoy)})\n\n` +
+    `💰 Ingresos:  ${formatMonto(ingresos)}\n` +
+    `💸 Gastos:    ${formatMonto(gastos)}\n` +
+    `${emoji} Balance:   ${formatMonto(balance)}\n\n` +
+    `Movimientos:\n${lista}`
+  );
+}
+
+/**
+ * Genera el balance del mes actual.
+ */
+export function generarBalance(movimientos) {
+  const hoy = ahoraChile();
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const filtrados = filtrarPorFecha(movimientos, desde, hoy);
+  const { ingresos, gastos, balance } = calcularTotales(filtrados);
+  const emoji = balance >= 0 ? '📈' : '📉';
+
+  return (
+    `💳 Balance de ${hoy.toLocaleString('es-CL', { month: 'long', timeZone: 'America/Santiago' })}:\n\n` +
+    `💰 Ingresos:  ${formatMonto(ingresos)}\n` +
+    `💸 Gastos:    ${formatMonto(gastos)}\n` +
+    `${emoji} Balance:   ${formatMonto(balance)}`
+  );
+}
+
+/**
  * Genera texto con los últimos N movimientos.
  */
 export function generarUltimosMovimientos(movimientos, n = 10) {
@@ -100,7 +159,6 @@ export function generarUltimosMovimientos(movimientos, n = 10) {
 
 /**
  * Retorna el rango de fechas según el período solicitado.
- * Usa zona horaria de Santiago de Chile.
  */
 export function getRango(periodo) {
   const hoy = ahoraChile();
