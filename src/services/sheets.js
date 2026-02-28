@@ -43,7 +43,7 @@ async function getSheetsClient() {
  */
 export async function appendMovement(data) {
   const sheets = await getSheetsClient();
-  const { fecha, tipo, monto, detalle } = data;
+  const { fecha, tipo, monto, medioPago, detalle } = data;
 
   const row = [`'${fecha}`, medioPago, tipo, monto, detalle];
 
