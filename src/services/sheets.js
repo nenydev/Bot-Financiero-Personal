@@ -18,6 +18,7 @@ async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   let credentials;
+  console.log('[DEBUG] Primeros 50 chars:', config.google.serviceAccountJson?.substring(0, 50));
   try {
     const json = config.google.serviceAccountJson.replace(/\\n/g, '\n');
     credentials = JSON.parse(json);
