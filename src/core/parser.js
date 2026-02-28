@@ -14,6 +14,7 @@
 import { parseAmount } from './amountParser.js';
 import { parseDate } from './dateParser.js';
 import { detectType } from './typeDetector.js';
+import { parsePayment } from './paymentParser.js';
 
 /**
  * @typedef {Object} ParseResult
@@ -50,11 +51,18 @@ export function parseMessage(text) {
   // 4. Detalle = mensaje original completo
   const detalle = text.trim();
 
+  // 5. Detectar medio de pago (opcional)
+  const medioPago = parsePayment(rawText);
+
+  
+
   return {
     success: true,
+    error: null,
     fecha,
     tipo,
     monto,
+    medioPago,
     detalle,
   };
 }

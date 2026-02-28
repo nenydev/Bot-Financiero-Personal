@@ -127,7 +127,7 @@ export async function handleTelegramWebhook(req, res) {
   }
 
   // 6. Confirmar al usuario
-  const reply = `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha}`;
+  const reply = `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha} — ${parsed.medioPago}`;
   await sendReply(chatId, reply);
 }
 
