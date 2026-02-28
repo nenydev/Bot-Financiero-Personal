@@ -36,7 +36,8 @@ function formatDate(date) {
  */
 export function parseDate(text) {
   const lower = text.toLowerCase().trim();
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
 
   // 1. dd/mm/yyyy
   const fullDatePattern = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/;

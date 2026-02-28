@@ -3,6 +3,16 @@
 // ============================================================
 
 /**
+ * Retorna la fecha actual en zona horaria de Santiago de Chile.
+ */
+function ahoraChile() {
+  const now = new Date();
+  const chile = new Date(now.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+  chile.setHours(0, 0, 0, 0);
+  return chile;
+}
+
+/**
  * Filtra movimientos por rango de fechas.
  * @param {Array} movimientos
  * @param {Date} desde
@@ -40,19 +50,24 @@ function formatMonto(n) {
 }
 
 /**
+ * Formatea una fecha como dd/mm/yyyy.
+ */
+function formatFecha(d) {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+/**
  * Genera el texto del resumen.
  */
 export function generarResumen(movimientos, titulo, desde, hasta) {
   const filtrados = filtrarPorFecha(movimientos, desde, hasta);
   const { ingresos, gastos, balance } = calcularTotales(filtrados);
 
-  const formatFecha = (d) =>
-    `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-
   const ultimos3 = filtrados.slice(-3).reverse();
-  const movimientosTexto = ultimos3.length > 0
-    ? ultimos3.map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`).join('\n')
-    : '• Sin movimientos';
+  const movimientosTexto =
+    ultimos3.length > 0
+      ? ultimos3.map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`).join('\n')
+      : '• Sin movimientos';
 
   const emoji = balance >= 0 ? '📈' : '📉';
 
@@ -74,7 +89,10 @@ export function generarUltimosMovimientos(movimientos, n = 10) {
   if (ultimos.length === 0) return '📋 No hay movimientos registrados.';
 
   const lista = ultimos
-    .map((m) => `• ${m.fecha.replace("'", '')} — ${m.tipo} ${`$${m.monto.toLocaleString('es-CL')}`}\n  ${m.detalle}`)
+    .map(
+      (m) =>
+        `• ${m.fecha.replace("'", '')} — ${m.tipo} $${m.monto.toLocaleString('es-CL')}\n  ${m.detalle}`
+    )
     .join('\n\n');
 
   return `📋 Últimos ${ultimos.length} movimientos:\n\n${lista}`;
@@ -82,10 +100,10 @@ export function generarUltimosMovimientos(movimientos, n = 10) {
 
 /**
  * Retorna el rango de fechas según el período solicitado.
+ * Usa zona horaria de Santiago de Chile.
  */
 export function getRango(periodo) {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+  const hoy = ahoraChile();
 
   switch (periodo) {
     case 'semanal': {
