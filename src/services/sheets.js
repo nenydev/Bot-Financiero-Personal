@@ -20,8 +20,10 @@ async function getSheetsClient() {
   let credentials;
   console.log('[DEBUG] Primeros 50 chars:', config.google.serviceAccountJson?.substring(0, 50));
   try {
-    const json = config.google.serviceAccountJson.replace(/\\n/g, '\n');
-    credentials = JSON.parse(json);
+    const clean = config.google.serviceAccountJson
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
+    credentials = JSON.parse(clean);
   } catch (err) {
     console.error('[DEBUG] Error exacto del parse:', err.message);
     throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido.');
