@@ -63,59 +63,24 @@ export async function appendMovement(data) {
   }
 }
 
-export async function formatSheet() {
+/**
+ * Lee todos los movimientos del Sheet.
+ * @returns {Promise<Array>}
+ */
+export async function getMovimientos() {
   const sheets = await getSheetsClient();
 
-  // Obtener el ID de la hoja
-  const spreadsheet = await sheets.spreadsheets.get({
+  const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.google.spreadsheetId,
+    range: `${config.google.sheetName}!A2:D`,
   });
 
-  const sheetId = spreadsheet.data.sheets.find(
-    (s) => s.properties.title === config.google.sheetName
-  )?.properties.sheetId;
+  const rows = res.data.values || [];
 
-  if (sheetId === undefined) return;
-
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: config.google.spreadsheetId,
-    requestBody: {
-      requests: [
-        // Encabezados en verde oscuro con texto blanco
-        {
-          repeatCell: {
-            range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
-            cell: {
-              userEnteredFormat: {
-                backgroundColor: { red: 0.13, green: 0.37, blue: 0.22 },
-                textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 }, fontSize: 11 },
-                horizontalAlignment: 'CENTER',
-              },
-            },
-            fields: 'userEnteredFormat',
-          },
-        },
-        // Ancho de columnas
-        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 120 }, fields: 'pixelSize' } },
-        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 100 }, fields: 'pixelSize' } },
-        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 120 }, fields: 'pixelSize' } },
-        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 }, properties: { pixelSize: 400 }, fields: 'pixelSize' } },
-        // Filas alternas en gris claro
-        {
-          addConditionalFormatRule: {
-            rule: {
-              ranges: [{ sheetId, startRowIndex: 1, endRowIndex: 1000 }],
-              booleanRule: {
-                condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: '=ISEVEN(ROW())' }] },
-                format: { backgroundColor: { red: 0.94, green: 0.94, blue: 0.94 } },
-              },
-            },
-            index: 0,
-          },
-        },
-      ],
-    },
-  });
-
-  console.log('[SHEETS] ✅ Formato aplicado');
+  return rows.map((row) => ({
+    fecha: row[0] || '',
+    tipo: row[1] || '',
+    monto: parseInt(row[2], 10) || 0,
+    detalle: row[3] || '',
+  }));
 }

@@ -8,7 +8,8 @@ import 'dotenv/config';
 import express from 'express';
 import { config, validateConfig } from './config.js';
 import { handleTelegramWebhook } from './channels/telegram.js';
-import { appendMovement, formatSheet } from './services/sheets.js';
+import { startScheduler } from './services/scheduler.js';
+
 
 // Validar configuración al iniciar
 try {
@@ -47,8 +48,7 @@ const PORT = config.port;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[SERVER] ✅ Bot financiero corriendo en puerto ${PORT}`);
   console.log(`[SERVER] Webhook Telegram: POST /webhook/telegram`);
-  formatSheet().catch((err) => console.error('[SHEETS] Error al formatear:', err.message));
-
+  startScheduler();
 });
 
 process.on('SIGTERM', () => {

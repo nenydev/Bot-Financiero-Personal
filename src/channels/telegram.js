@@ -24,6 +24,9 @@
 import { WHITELIST, config } from '../config.js';
 import { parseMessage } from '../core/parser.js';
 import { appendMovement } from '../services/sheets.js';
+import { getMovimientos } from '../services/sheets.js';
+import { generarResumen, generarUltimosMovimientos, getRango } from '../core/resumen.js';
+
 
 const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
@@ -76,7 +79,13 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  // 2. Parsear el mensaje (lógica 100% independiente de Telegram)
+  // 2. Detectar comandos
+  if (text.startsWith('/')) {
+    await handleCommand(chatId, text.toLowerCase().trim());
+    return;
+  }
+
+  // 3. Parsear el mensaje (lógica 100% independiente de Telegram)
   const parsed = parseMessage(text);
 
   if (!parsed.success) {
@@ -98,4 +107,45 @@ export async function handleTelegramWebhook(req, res) {
   // 4. Confirmar al usuario
   const reply = `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha}`;
   await sendReply(chatId, reply);
+}
+
+async function handleCommand(chatId, text) {
+  // /movimientos
+  if (text === '/movimientos') {
+    try {
+      const movimientos = await getMovimientos();
+      const respuesta = generarUltimosMovimientos(movimientos, 10);
+      await sendReply(chatId, respuesta);
+    } catch {
+      await sendReply(chatId, '❌ Error al obtener los movimientos.');
+    }
+    return;
+  }
+
+  // /resumen semanal|mensual|trimestral|semestral|anual
+  const match = text.match(/^\/resumen\s+(semanal|mensual|trimestral|semestral|anual)$/);
+  if (match) {
+    try {
+      const periodo = match[1];
+      const movimientos = await getMovimientos();
+      const rango = getRango(periodo);
+      const respuesta = generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta);
+      await sendReply(chatId, respuesta);
+    } catch {
+      await sendReply(chatId, '❌ Error al generar el resumen.');
+    }
+    return;
+  }
+
+  // Comando no reconocido
+  await sendReply(
+    chatId,
+    '❓ Comandos disponibles:\n\n' +
+    '/resumen semanal\n' +
+    '/resumen mensual\n' +
+    '/resumen trimestral\n' +
+    '/resumen semestral\n' +
+    '/resumen anual\n' +
+    '/movimientos'
+  );
 }
