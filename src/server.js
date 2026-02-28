@@ -53,4 +53,13 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER] Error no capturado:', err.message);
+  console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER] Promise rechazada:', reason);
+});
+
 export default app;
