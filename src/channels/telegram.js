@@ -23,19 +23,16 @@
 
 import { WHITELIST, config } from '../config.js';
 import { parseMessage } from '../core/parser.js';
-import { appendMovement } from '../services/sheets.js';
-import { getMovimientos } from '../services/sheets.js';
+import { appendMovement, getMovimientos } from '../services/sheets.js';
 import { generarResumen, generarUltimosMovimientos, getRango } from '../core/resumen.js';
 
 // Estado temporal de conversaciones (se resetea si el servidor reinicia)
 const conversationState = new Map();
-const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
+const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
 /**
  * Envía un mensaje de texto a un chat de Telegram.
- * @param {number|string} chatId
- * @param {string} text
  */
 async function sendReply(chatId, text) {
   try {
@@ -51,8 +48,6 @@ async function sendReply(chatId, text) {
 
 /**
  * Procesa un webhook de Telegram.
- * @param {import('express').Request} req
- * @param {import('express').Response} res
  */
 export async function handleTelegramWebhook(req, res) {
   // Responder 200 inmediatamente para que Telegram no reintente
@@ -60,7 +55,6 @@ export async function handleTelegramWebhook(req, res) {
 
   const body = req.body;
 
-  // Ignorar actualizaciones sin mensaje de texto
   const message = body?.message;
   if (!message || !message.text) {
     console.log('[TELEGRAM] Update sin texto, ignorando.');
@@ -83,11 +77,38 @@ export async function handleTelegramWebhook(req, res) {
 
   // 2. Detectar comandos
   if (text.startsWith('/')) {
-    await handleCommand(chatId, text.toLowerCase().trim());
+    await handleCommand(chatId, userId, text.toLowerCase().trim());
     return;
   }
 
-  // 3. Parsear el mensaje (lógica 100% independiente de Telegram)
+  // 3. Manejar respuesta de período si el usuario está en medio de un /resumen
+  if (conversationState.get(userId) === 'esperando_periodo') {
+    const opciones = {
+      '1': 'semanal', '2': 'mensual', '3': 'trimestral', '4': 'semestral', '5': 'anual',
+      'semanal': 'semanal', 'mensual': 'mensual', 'trimestral': 'trimestral',
+      'semestral': 'semestral', 'anual': 'anual',
+    };
+
+    const periodo = opciones[text.toLowerCase().trim()];
+
+    if (periodo) {
+      conversationState.delete(userId);
+      try {
+        const movimientos = await getMovimientos();
+        const rango = getRango(periodo);
+        const respuesta = generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta);
+        await sendReply(chatId, respuesta);
+      } catch (err) {
+        console.error('[TELEGRAM] Error generando resumen:', err.message);
+        await sendReply(chatId, '❌ Error al generar el resumen.');
+      }
+    } else {
+      await sendReply(chatId, 'Responde con un número del 1 al 5 o escribe el período (semanal, mensual, trimestral, semestral, anual).');
+    }
+    return;
+  }
+
+  // 4. Parsear el mensaje financiero
   const parsed = parseMessage(text);
 
   if (!parsed.success) {
@@ -96,21 +117,23 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  // 3. Guardar en Google Sheets
+  // 5. Guardar en Google Sheets
   try {
     await appendMovement(parsed);
   } catch (err) {
     console.error('[TELEGRAM] Error guardando movimiento:', err.message);
-    console.error('[TELEGRAM] Stack:', err.stack); // NUEVO
     await sendReply(chatId, '❌ Error al guardar el movimiento. Intenta más tarde.');
     return;
   }
 
-  // 4. Confirmar al usuario
+  // 6. Confirmar al usuario
   const reply = `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha}`;
   await sendReply(chatId, reply);
 }
 
+/**
+ * Maneja comandos que empiezan con /
+ */
 async function handleCommand(chatId, userId, text) {
   // /movimientos
   if (text === '/movimientos') {
@@ -118,8 +141,25 @@ async function handleCommand(chatId, userId, text) {
       const movimientos = await getMovimientos();
       const respuesta = generarUltimosMovimientos(movimientos, 10);
       await sendReply(chatId, respuesta);
-    } catch {
+    } catch (err) {
+      console.error('[TELEGRAM] Error obteniendo movimientos:', err.message);
       await sendReply(chatId, '❌ Error al obtener los movimientos.');
+    }
+    return;
+  }
+
+  // /resumen con período directo: /resumen mensual
+  const matchDirecto = text.match(/^\/resumen\s+(semanal|mensual|trimestral|semestral|anual)$/);
+  if (matchDirecto) {
+    try {
+      const periodo = matchDirecto[1];
+      const movimientos = await getMovimientos();
+      const rango = getRango(periodo);
+      const respuesta = generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta);
+      await sendReply(chatId, respuesta);
+    } catch (err) {
+      console.error('[TELEGRAM] Error generando resumen:', err.message);
+      await sendReply(chatId, '❌ Error al generar el resumen.');
     }
     return;
   }
