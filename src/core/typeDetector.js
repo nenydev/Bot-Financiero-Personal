@@ -70,6 +70,9 @@ const EXPENSE_KEYWORDS = [
   'recibo',
   'préstamo', 'prestamo',
   'interés', 'interes',
+  'acabo de comprar',
+  'fui a comprar',
+  'salí a comprar', 'sali a comprar',
 ];
 
 /**
