@@ -9,6 +9,7 @@
 
 // Verbos y palabras que indican gasto
 const EXPENSE_KEYWORDS = [
+  // Verbos directos
   'gasté', 'gaste',
   'pagué', 'pague',
   'compré', 'compre',
@@ -16,14 +17,52 @@ const EXPENSE_KEYWORDS = [
   'envié', 'envie',
   'salió', 'salio',
   'débito', 'debito',
-  'debitó', 'debito',
   'invertí', 'inverti',
-  'pagado',
-  'gasto',
-  'pago',
-  'compra',
-  'debit',
-  'cargo',
+  'saqué', 'saque',
+  'retiré', 'retire',
+  'perdí', 'perdi',
+  'presté', 'preste',
+  'devolví', 'devolvi',
+  'aboné', 'abone',
+  'abonué', 'aboune',
+  'cancelé', 'cancele',
+  'deposité', 'deposite',
+
+  // Me/nos + verbo
+  'me costó', 'me costo',
+  'me cobró', 'me cobro',
+  'me descontaron',
+  'me cargaron',
+  'me quitaron',
+  'nos costó', 'nos costo',
+  'nos cobraron',
+  'nos descontaron',
+
+  // Se + verbo
+  'se fue',
+  'se fueron',
+  'se gastó', 'se gasto',
+  'se pagó', 'se pago',
+  'salieron',
+  'cargaron',
+  'descontaron',
+  'cobraron',
+
+  // Sustantivos que implican gasto
+  'factura',
+  'cuenta',
+  'cuota',
+  'mensualidad',
+  'arriendo',
+  'alquiler',
+  'multa',
+  'deuda',
+  'servicio',
+  'servicios',
+  'mercado',
+  'recibo',
+  'préstamo', 'prestamo',
+  'interés', 'interes',
 ];
 
 /**

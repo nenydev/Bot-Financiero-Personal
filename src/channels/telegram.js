@@ -27,8 +27,10 @@ import { appendMovement } from '../services/sheets.js';
 import { getMovimientos } from '../services/sheets.js';
 import { generarResumen, generarUltimosMovimientos, getRango } from '../core/resumen.js';
 
-
+// Estado temporal de conversaciones (se resetea si el servidor reinicia)
+const conversationState = new Map();
 const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
+
 
 /**
  * Envía un mensaje de texto a un chat de Telegram.
@@ -109,7 +111,7 @@ export async function handleTelegramWebhook(req, res) {
   await sendReply(chatId, reply);
 }
 
-async function handleCommand(chatId, text) {
+async function handleCommand(chatId, userId, text) {
   // /movimientos
   if (text === '/movimientos') {
     try {
@@ -122,18 +124,18 @@ async function handleCommand(chatId, text) {
     return;
   }
 
-  // /resumen semanal|mensual|trimestral|semestral|anual
-  const match = text.match(/^\/resumen\s+(semanal|mensual|trimestral|semestral|anual)$/);
-  if (match) {
-    try {
-      const periodo = match[1];
-      const movimientos = await getMovimientos();
-      const rango = getRango(periodo);
-      const respuesta = generarResumen(movimientos, rango.titulo, rango.desde, rango.hasta);
-      await sendReply(chatId, respuesta);
-    } catch {
-      await sendReply(chatId, '❌ Error al generar el resumen.');
-    }
+  // /resumen sin período → preguntar
+  if (text === '/resumen') {
+    conversationState.set(userId, 'esperando_periodo');
+    await sendReply(
+      chatId,
+      '¿Qué período quieres consultar?\n\n' +
+      '1️⃣ Semanal\n' +
+      '2️⃣ Mensual\n' +
+      '3️⃣ Trimestral\n' +
+      '4️⃣ Semestral\n' +
+      '5️⃣ Anual'
+    );
     return;
   }
 
@@ -141,11 +143,7 @@ async function handleCommand(chatId, text) {
   await sendReply(
     chatId,
     '❓ Comandos disponibles:\n\n' +
-    '/resumen semanal\n' +
-    '/resumen mensual\n' +
-    '/resumen trimestral\n' +
-    '/resumen semestral\n' +
-    '/resumen anual\n' +
-    '/movimientos'
+    '/resumen — resumen financiero\n' +
+    '/movimientos — últimos 10 movimientos'
   );
 }
