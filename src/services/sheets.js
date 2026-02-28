@@ -19,11 +19,8 @@ async function getSheetsClient() {
 
   let credentials;
   try {
-    console.log('[DEBUG] Primeros 50 chars del JSON env:', config.google.serviceAccountJson?.substring(0, 50));
-    console.log('[DEBUG] JSON decodificado, primeros 20 chars:', raw.substring(0, 20));
-    credentials = JSON.parse(config.google.serviceAccountJson.replace(/\\n/g, '\n'))
-    console.log('[DEBUG] Credenciales parseadas, client_email:', credentials.client_email);
-    console.log('[DEBUG] Private key empieza con:', credentials.private_key?.substring(0, 40));
+    const json = config.google.serviceAccountJson.replace(/\\n/g, '\n');
+    credentials = JSON.parse(json);
   } catch (err) {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido.');
   }
