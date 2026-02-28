@@ -23,6 +23,7 @@ async function getSheetsClient() {
     const json = config.google.serviceAccountJson.replace(/\\n/g, '\n');
     credentials = JSON.parse(json);
   } catch (err) {
+    console.error('[DEBUG] Error exacto del parse:', err.message);
     throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido.');
   }
 
