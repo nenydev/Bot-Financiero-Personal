@@ -14,6 +14,8 @@ const EXPENSE_KEYWORDS = [
   'pagué', 'pague',
   'compré', 'compre',
   'transferí', 'transferi',
+  'hice una transferencia',
+  'envié', 'envie',
   'envié', 'envie',
   'salió', 'salio',
   'débito', 'debito',
