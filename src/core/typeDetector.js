@@ -29,6 +29,9 @@ const EXPENSE_KEYWORDS = [
   'abonué', 'aboune',
   'cancelé', 'cancele',
   'deposité', 'deposite',
+  'perdí', 'perdi',
+  'quitó', 'quito',
+  'robó', 'robo',
 
   // Me/nos + verbo
   'me costó', 'me costo',
@@ -39,6 +42,8 @@ const EXPENSE_KEYWORDS = [
   'nos costó', 'nos costo',
   'nos cobraron',
   'nos descontaron',
+  'me robaron',
+  'me multaron',
 
   // Se + verbo
   'se fue',
