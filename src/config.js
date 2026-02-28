@@ -13,7 +13,8 @@ import 'dotenv/config';
 export const WHITELIST = [
   // Ejemplo: 123456789
   // Ejemplo: 987654321
-  5966834377,
+  5966834377, //henry
+  8368683187, //andres
 ];
 
 export const config = {
