@@ -45,7 +45,7 @@ export async function appendMovement(data) {
   const sheets = await getSheetsClient();
   const { fecha, tipo, monto, detalle } = data;
 
-  const row = [fecha, tipo, monto, detalle];
+  const row = [`'${fecha}`, tipo, monto, detalle];
 
   try {
     await sheets.spreadsheets.values.append({
