@@ -18,7 +18,6 @@ const EXPENSE_KEYWORDS = [
   'envié', 'envie',
   'envié', 'envie',
   'salió', 'salio',
-  'débito', 'debito',
   'invertí', 'inverti',
   'saqué', 'saque',
   'retiré', 'retire',
