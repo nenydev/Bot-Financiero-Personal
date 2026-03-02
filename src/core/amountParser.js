@@ -18,11 +18,14 @@
  */
 export function parseAmount(text) {
   const lower = text.toLowerCase().trim();
+  console.log('[AMOUNT] Texto a parsear:', lower);
+
 
   // Primero evaluar patrones compuestos (lucas, mil, k) antes que número simple
 
   // "4 lucas" / "4 lukas"
   const lucasMatch = lower.match(/\b(\d+(?:[.,]\d{3})?)\s*luk?as?\b/i);
+  console.log('[AMOUNT] Lucas match:', lucasMatch);
   if (lucasMatch) return normalizeNumber(lucasMatch[1]) * 1000;
 
   // "4 mil" / "4mil"
