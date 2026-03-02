@@ -19,44 +19,27 @@
 export function parseAmount(text) {
   const lower = text.toLowerCase().trim();
 
-  // Patrón: número seguido de "k" → ej: 20k, 20K
-  const kPattern = /\b(\d+(?:[.,]\d{3})?)\s*k\b/i;
-  const kMatch = lower.match(kPattern);
-  if (kMatch) {
-    const base = normalizeNumber(kMatch[1]);
-    return base * 1000;
-  }
+  // Primero evaluar patrones compuestos (lucas, mil, k) antes que número simple
 
-  // Patrón: número seguido de "mil" → ej: 20 mil, 20mil
-  const milPattern = /\b(\d+(?:[.,]\d{3})?)\s*mil\b/i;
-  const milMatch = lower.match(milPattern);
-  if (milMatch) {
-    const base = normalizeNumber(milMatch[1]);
-    return base * 1000;
-  }
+  // "4 lucas" / "4 lukas"
+  const lucasMatch = lower.match(/\b(\d+(?:[.,]\d{3})?)\s*luk?as?\b/i);
+  if (lucasMatch) return normalizeNumber(lucasMatch[1]) * 1000;
 
-  // Patrón: número seguido de "lucas" o "lukas" → ej: 20 lucas, 20 lukas
-  const lucasPattern = /\b(\d+(?:[.,]\d{3})?)\s*luk?as?\b/i;
-  const lucasMatch = lower.match(lucasPattern);
-  if (lucasMatch) {
-    const base = normalizeNumber(lucasMatch[1]);
-    return base * 1000;
-  }
+  // "4 mil" / "4mil"
+  const milMatch = lower.match(/\b(\d+(?:[.,]\d{3})?)\s*mil\b/i);
+  if (milMatch) return normalizeNumber(milMatch[1]) * 1000;
 
-  // Patrón: número con separadores de miles → ej: 20.000 o 20,000
-  // Se distingue de decimales porque el grupo después del separador tiene exactamente 3 dígitos
-  const thousandsPattern = /\b(\d{1,3}(?:[.,]\d{3})+)\b/;
-  const thousandsMatch = text.match(thousandsPattern);
-  if (thousandsMatch) {
-    return normalizeNumber(thousandsMatch[1]);
-  }
+  // "4k" / "4K"
+  const kMatch = lower.match(/\b(\d+(?:[.,]\d{3})?)\s*k\b/i);
+  if (kMatch) return normalizeNumber(kMatch[1]) * 1000;
 
-  // Patrón: número entero simple → ej: 20000
-  const plainPattern = /\b(\d+)\b/;
-  const plainMatch = text.match(plainPattern);
-  if (plainMatch) {
-    return parseInt(plainMatch[1], 10);
-  }
+  // "20.000" / "20,000"
+  const thousandsMatch = text.match(/\b(\d{1,3}(?:[.,]\d{3})+)\b/);
+  if (thousandsMatch) return normalizeNumber(thousandsMatch[1]);
+
+  // Número entero simple: 20000
+  const plainMatch = text.match(/\b(\d+)\b/);
+  if (plainMatch) return parseInt(plainMatch[1], 10);
 
   return null;
 }
