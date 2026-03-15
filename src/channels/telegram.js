@@ -88,7 +88,7 @@ export async function handleTelegramWebhook(req, res) {
       return;
     }
 
-    const fecha = formatDate(parseDate(text));
+    const fecha = parseDate(text);
 
     try {
       await appendEnvio({ fecha, monto, detalle: text });

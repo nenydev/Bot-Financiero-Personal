@@ -5,6 +5,7 @@
 const ENVIO_KEYWORDS = [
   'envio', 'envío',
   'envié', 'envie',
+  'envíe', 'envió',
   'enviamos',
 ];
 
