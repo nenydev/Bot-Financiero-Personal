@@ -59,10 +59,10 @@ export function generarResumen(movimientos, titulo, desde, hasta) {
   const filtrados = filtrarPorFecha(movimientos, desde, hasta);
   const { ingresos, gastos, balance } = calcularTotales(filtrados);
 
-  const ultimos3 = filtrados.slice(-3).reverse();
+  const ultimos5 = filtrados.slice(-5).reverse();
   const movimientosTexto =
-    ultimos3.length > 0
-      ? ultimos3.map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`).join('\n')
+    ultimos5.length > 0
+      ? ultimos5.map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`).join('\n')
       : '• Sin movimientos';
 
   const emoji = balance >= 0 ? '📈' : '📉';
@@ -85,8 +85,8 @@ export function generarResumenHistorico(movimientos) {
   const { ingresos, gastos, balance } = calcularTotales(movimientos);
   const emoji = balance >= 0 ? '📈' : '📉';
 
-  const ultimos3 = movimientos.slice(-3).reverse();
-  const movimientosTexto = ultimos3
+  const ultimos5 = movimientos.slice(-5).reverse();
+  const movimientosTexto = ultimos5
     .map((m) => `• ${m.tipo} ${formatMonto(m.monto)} — ${m.detalle}`)
     .join('\n');
 
@@ -190,4 +190,29 @@ export function getRango(periodo) {
     default:
       return null;
   }
+}
+
+/**
+ * Genera el resumen de envíos para un período.
+ */
+export function generarResumenEnvios(envios, titulo, desde, hasta) {
+  const filtrados = envios.filter((e) => {
+    const [d, mes, a] = e.fecha.replace("'", '').split('/');
+    const fecha = new Date(parseInt(a), parseInt(mes) - 1, parseInt(d));
+    return fecha >= desde && fecha <= hasta;
+  });
+
+  const total = filtrados.reduce((sum, e) => sum + e.monto, 0);
+
+  const ultimos5 = filtrados.slice(-5).reverse();
+  const lista = ultimos5.length > 0
+    ? ultimos5.map((e) => `• ${e.fecha.replace("'", '')} — $${e.monto.toLocaleString('es-CL')} — ${e.detalle}`).join('\n')
+    : '• Sin envíos';
+
+  return (
+    `📦 ${titulo} (${formatFecha(desde)} - ${formatFecha(hasta)})\n\n` +
+    `Total enviado: $${total.toLocaleString('es-CL')}\n` +
+    `Cantidad: ${filtrados.length} envío${filtrados.length !== 1 ? 's' : ''}\n\n` +
+    `Últimos envíos:\n${lista}`
+  );
 }

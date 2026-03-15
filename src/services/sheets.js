@@ -79,12 +79,10 @@ export async function getMovimientos() {
 
 /**
  * Elimina un movimiento del Sheet buscándolo por sus valores.
- * @param {{ fecha: string, tipo: string, monto: number, detalle: string }} movimiento
  */
 export async function deleteMovimiento(movimiento) {
   const sheets = await getSheetsClient();
 
-  // Obtener todas las filas para encontrar el índice exacto
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.google.spreadsheetId,
     range: `${config.google.sheetName}!A:E`,
@@ -92,7 +90,6 @@ export async function deleteMovimiento(movimiento) {
 
   const rows = res.data.values || [];
 
-  // Buscar la fila que coincida con el movimiento (de abajo hacia arriba)
   let rowIndex = -1;
   for (let i = rows.length - 1; i >= 1; i--) {
     const row = rows[i];
@@ -107,11 +104,8 @@ export async function deleteMovimiento(movimiento) {
     }
   }
 
-  if (rowIndex === -1) {
-    throw new Error('No se encontró el movimiento en el Sheet.');
-  }
+  if (rowIndex === -1) throw new Error('No se encontró el movimiento en el Sheet.');
 
-  // Obtener el sheetId
   const spreadsheet = await sheets.spreadsheets.get({
     spreadsheetId: config.google.spreadsheetId,
   });
@@ -120,28 +114,68 @@ export async function deleteMovimiento(movimiento) {
     (s) => s.properties.title === config.google.sheetName
   )?.properties.sheetId;
 
-  if (sheetId === undefined) {
-    throw new Error('No se encontró la hoja en el Spreadsheet.');
-  }
+  if (sheetId === undefined) throw new Error('No se encontró la hoja en el Spreadsheet.');
 
-  // Eliminar la fila
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: config.google.spreadsheetId,
     requestBody: {
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId,
-              dimension: 'ROWS',
-              startIndex: rowIndex,
-              endIndex: rowIndex + 1,
-            },
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: 'ROWS',
+            startIndex: rowIndex,
+            endIndex: rowIndex + 1,
           },
         },
-      ],
+      }],
     },
   });
 
   console.log(`[SHEETS] ✅ Movimiento eliminado en fila ${rowIndex + 1}`);
+}
+
+/**
+ * Agrega un envío en la hoja Envios.
+ */
+export async function appendEnvio(data) {
+  const sheets = await getSheetsClient();
+  const { fecha, monto, detalle } = data;
+
+  const row = [`'${fecha}`, monto, detalle];
+
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: config.google.spreadsheetId,
+      range: `Envios!A:C`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'OVERWRITE',
+      requestBody: {
+        values: [row],
+      },
+    });
+    console.log(`[SHEETS] ✅ Envío registrado: $${monto} — ${detalle}`);
+  } catch (err) {
+    throw new Error('No se pudo guardar el envío en Google Sheets.');
+  }
+}
+
+/**
+ * Lee todos los envíos de la hoja Envios.
+ */
+export async function getEnvios() {
+  const sheets = await getSheetsClient();
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.google.spreadsheetId,
+    range: `Envios!A2:C`,
+  });
+
+  const rows = res.data.values || [];
+
+  return rows.map((row) => ({
+    fecha: row[0] || '',
+    monto: parseInt(row[1], 10) || 0,
+    detalle: row[2] || '',
+  }));
 }

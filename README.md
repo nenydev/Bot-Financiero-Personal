@@ -8,7 +8,7 @@ Le escribes `gasté 20000 en supermercado` y él solo se encarga de guardarlo.
 
 ## Cómo funciona
 
-El bot recibe mensajes de texto, detecta el monto, la fecha y si es un ingreso o gasto, y lo agrega como una fila nueva en tu planilla de Google Sheets. Todo sin inteligencia artificial — el parseo es mediante reglas y heurísticas, lo que lo hace predecible y fácil de ajustar.
+El bot recibe mensajes de texto, detecta el monto, la fecha, el tipo de movimiento y el medio de pago, y lo agrega como una fila nueva en tu planilla de Google Sheets. Todo sin inteligencia artificial — el parseo es mediante reglas y heurísticas, lo que lo hace predecible y fácil de ajustar.
 
 Solo los usuarios que estén en la whitelist pueden usarlo. Ideal para uso personal o familiar cerrado.
 
@@ -18,18 +18,43 @@ Solo los usuarios que estén en la whitelist pueden usarlo. Ideal para uso perso
 
 ```
 gasté 20000 en supermercado
-pagué 1.500 de taxi ayer
+pagué 1.500 de taxi ayer con tarjeta
 recibí 150k de sueldo
-transferí 50 mil a Juan el 10/01/2026
-compré zapatillas por 45.000 el 3 de marzo
+me transfirieron 50 mil por BancoEstado
+compré zapatillas por 45.000 el 3 de marzo en efectivo
 me depositaron 200 lucas hoy
+gané 4 lucas en el casino
+la policía me quitó 3 lucas
 ```
 
-Formatos de monto que entiende: `20000`, `20.000`, `20,000`, `20k`, `20 mil`, `20 lucas`
+**Montos:** `20000`, `20.000`, `20,000`, `20k`, `20 mil`, `20 lucas`, `20 lukas`
 
-Fechas: `dd/mm/yyyy`, `dd/mm/yy`, `2 de enero`, `4 de abril de 2026`, `hoy`, `ayer`, `anteayer`, `la semana pasada`
+**Fechas:** `dd/mm/yyyy`, `dd/mm/yy`, `2 de enero`, `4 de abril de 2026`, `hoy`, `ayer`, `anteayer`, `la semana pasada`
 
-Si no detecta un monto, responde avisando. Si no hay fecha, usa la fecha de hoy.
+**Medio de pago detectado automáticamente:**
+- Transferencia: bancoestado, banco de chile, bci, scotiabank, santander, itaú, transferí, me transfirieron, le mandé...
+- Efectivo: efectivo, cash, en mano, billetes...
+- Tarjeta/Punto: tarjeta, débito, crédito, punto de venta, por caja...
+- Sin mención: No especificado
+
+---
+
+## Comandos disponibles
+
+| Comando | Descripción |
+|---|---|
+| `/hoy` | Resumen de los movimientos del día |
+| `/semanal` | Resumen de los últimos 7 días |
+| `/mensual` | Resumen del mes actual |
+| `/trimestral` | Resumen de los últimos 3 meses |
+| `/semestral` | Resumen de los últimos 6 meses |
+| `/anual` | Resumen del año actual |
+| `/historico` | Resumen de todos los movimientos |
+| `/balance` | Balance rápido del mes actual |
+| `/movimientos` | Últimos 10 movimientos registrados |
+| `/ultimo` | Último movimiento registrado |
+| `/borrar` | Eliminar un movimiento (con confirmación) |
+| `/ayuda` | Lista de comandos y ejemplos |
 
 ---
 
@@ -40,6 +65,7 @@ Si no detecta un monto, responde avisando. Si no hay fecha, usa la fecha de hoy.
 - Telegram Bot API via Webhook
 - Google Sheets API con Service Account
 - Sin base de datos propia — todo va directo al Sheet
+- Desplegado en Render con UptimeRobot para mantenerlo activo
 
 ---
 
@@ -49,15 +75,18 @@ Si no detecta un monto, responde avisando. Si no hay fecha, usa la fecha de hoy.
 financial-bot/
 ├── src/
 │   ├── channels/
-│   │   ├── telegram.js        ← todo lo que tiene que ver con Telegram
+│   │   ├── telegram.js        ← webhook, comandos y respuestas
 │   │   └── whatsapp.js        ← referencia para migración futura
 │   ├── core/
 │   │   ├── parser.js          ← orquesta el parseo completo
 │   │   ├── amountParser.js    ← detecta y normaliza montos
 │   │   ├── dateParser.js      ← detecta y normaliza fechas
-│   │   └── typeDetector.js    ← decide si es Ingreso o Gasto
+│   │   ├── typeDetector.js    ← decide si es Ingreso o Gasto
+│   │   ├── paymentParser.js   ← detecta el medio de pago
+│   │   └── resumen.js         ← genera resúmenes financieros
 │   ├── services/
-│   │   └── sheets.js          ← escribe en Google Sheets
+│   │   ├── sheets.js          ← lee y escribe en Google Sheets
+│   │   └── scheduler.js       ← resúmenes automáticos
 │   ├── config.js              ← whitelist y configuración
 │   └── server.js              ← servidor Express y rutas
 ├── .env.example
@@ -66,7 +95,19 @@ financial-bot/
 └── package.json
 ```
 
-La lógica de parseo está completamente separada del canal. Si en algún momento quieres migrar a WhatsApp, el core no se toca — solo cambia el adaptador en `channels/`.
+La lógica de parseo está completamente separada del canal. Si en algún momento quieres migrar a WhatsApp, el `core/` no se toca — solo cambia el adaptador en `channels/`.
+
+---
+
+## Columnas del Google Sheet
+
+| Columna | Contenido |
+|---|---|
+| A | Fecha (dd/mm/yyyy) |
+| B | Medio de pago |
+| C | Tipo (Ingreso / Gasto) |
+| D | Monto |
+| E | Detalle (mensaje original) |
 
 ---
 
@@ -84,7 +125,10 @@ Ese es tu `TELEGRAM_BOT_TOKEN`. Guárdalo.
 
 ### 2. Crear el Google Sheet
 
-Entra a [sheets.google.com](https://sheets.google.com), crea una planilla nueva y renombra la primera hoja como `Movimientos`. El bot crea los encabezados automáticamente en el primer uso.
+Entra a [sheets.google.com](https://sheets.google.com), crea una planilla nueva y renombra la primera hoja como `Movimientos`.
+
+Agrega los encabezados manualmente en la fila 1:
+- A1: `Fecha` | B1: `Medio de pago` | C1: `Tipo` | D1: `Monto` | E1: `Detalle`
 
 De la URL copia el ID:
 ```
@@ -182,9 +226,7 @@ ngrok http 3000
 Ngrok te da una URL como `https://abc123.ngrok-free.app`. Regístrala como webhook:
 
 ```bash
-curl -X POST "https://api.telegram.org/botTU_TOKEN/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://abc123.ngrok-free.app/webhook/telegram"}'
+curl -X POST "https://api.telegram.org/botTU_TOKEN/setWebhook" -H "Content-Type: application/json" -d "{\"url\":\"https://abc123.ngrok-free.app/webhook/telegram\"}"
 ```
 
 Para verificar que quedó bien:
@@ -197,42 +239,39 @@ curl "https://api.telegram.org/botTU_TOKEN/getWebhookInfo"
 
 ---
 
-## Deploy en producción
+## Deploy en Render (recomendado)
 
-### Vercel
-
-```bash
-npm i -g vercel
-vercel --prod
-```
-
-Configura las variables de entorno en el dashboard (Settings → Environment Variables) y registra el webhook con la URL de producción.
-
-### Render / Railway
-
-Conecta tu repositorio de GitHub en la plataforma y configura las variables de entorno en el panel. Ambas detectan Node.js automáticamente.
-
-- Build command: `npm install`
-- Start command: `npm start`
-
-### Google Cloud Run
-
-Agrega un `Dockerfile` al proyecto:
-
-```dockerfile
-FROM node:22-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-EXPOSE 8080
-ENV PORT=8080
-CMD ["npm", "start"]
-```
+1. Crea una cuenta en [render.com](https://render.com)
+2. Nuevo proyecto → **Web Service** → conecta tu repositorio de GitHub
+3. Configura:
+   - Build command: `npm install`
+   - Start command: `node src/server.js`
+   - Plan: **Free**
+4. Agrega las variables de entorno en el panel de Render
+5. Una vez desplegado, registra el webhook con la URL de Render:
 
 ```bash
-gcloud run deploy financial-bot --source . --region us-central1 --allow-unauthenticated
+curl -X POST "https://api.telegram.org/botTU_TOKEN/setWebhook" -H "Content-Type: application/json" -d "{\"url\":\"https://tu-app.onrender.com/webhook/telegram\"}"
 ```
+
+### Mantener el servidor activo con UptimeRobot
+
+El plan gratuito de Render duerme el servidor tras 15 minutos de inactividad. Para mantenerlo activo en horario de uso (8am a 12am hora Chile):
+
+1. Crea una cuenta en [uptimerobot.com](https://uptimerobot.com)
+2. Nuevo monitor → **HTTP(s)**
+3. URL: `https://tu-app.onrender.com/ping`
+4. Intervalo: 5 minutos
+
+El endpoint `/ping` responde 200 de 8am a 12am hora Chile y 503 el resto del tiempo, así el servidor duerme fuera de horario.
+
+---
+
+## Resúmenes automáticos
+
+El bot envía resúmenes automáticos a todos los usuarios de la whitelist:
+- Domingos a las 9pm (hora Chile) — resumen semanal
+- Último día del mes a las 9pm (hora Chile) — resumen mensual
 
 ---
 

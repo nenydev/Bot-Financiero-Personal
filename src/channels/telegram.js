@@ -5,7 +5,16 @@
 
 import { WHITELIST, config } from '../config.js';
 import { parseMessage } from '../core/parser.js';
-import { appendMovement, getMovimientos, deleteMovimiento } from '../services/sheets.js';
+import { esEnvio } from '../core/envioParser.js';
+import { parseAmount } from '../core/amountParser.js';
+import { parseDate, formatDate } from '../core/dateParser.js';
+import {
+  appendMovement,
+  getMovimientos,
+  deleteMovimiento,
+  appendEnvio,
+  getEnvios,
+} from '../services/sheets.js';
 import {
   generarResumen,
   generarResumenHistorico,
@@ -13,11 +22,10 @@ import {
   generarBalance,
   generarUltimosMovimientos,
   getRango,
+  generarResumenEnvios,
 } from '../core/resumen.js';
 
-// Estado temporal de conversaciones
 const conversationState = new Map();
-
 const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
 async function sendReply(chatId, text) {
@@ -72,7 +80,27 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  // 4. Parsear mensaje financiero
+  // 4. Detectar si es un envío
+  if (esEnvio(text)) {
+    const monto = parseAmount(text);
+    if (!monto) {
+      await sendReply(chatId, '❌ No pude identificar el monto del envío.');
+      return;
+    }
+
+    const fecha = formatDate(parseDate(text));
+
+    try {
+      await appendEnvio({ fecha, monto, detalle: text });
+      await sendReply(chatId, `📦 Envío registrado: $${monto.toLocaleString('es-CL')} — ${text}`);
+    } catch (err) {
+      console.error('[TELEGRAM] Error guardando envío:', err.message);
+      await sendReply(chatId, '❌ Error al guardar el envío. Intenta más tarde.');
+    }
+    return;
+  }
+
+  // 5. Parsear mensaje financiero
   const parsed = parseMessage(text);
 
   if (!parsed.success) {
@@ -97,7 +125,7 @@ async function handleCommand(chatId, userId, text) {
   if (text === '/ayuda') {
     await sendReply(chatId,
       '🤖 Comandos disponibles:\n\n' +
-      '📊 Resúmenes:\n' +
+      '📊 Resúmenes financieros:\n' +
       '/hoy — movimientos de hoy\n' +
       '/semanal — últimos 7 días\n' +
       '/mensual — mes actual\n' +
@@ -109,12 +137,19 @@ async function handleCommand(chatId, userId, text) {
       '/balance — balance del mes actual\n' +
       '/movimientos — últimos 10 movimientos\n' +
       '/ultimo — último movimiento registrado\n\n' +
+      '📦 Envíos:\n' +
+      '/envios_semanal — envíos de los últimos 7 días\n' +
+      '/envios_mensual — envíos del mes actual\n' +
+      '/envios_anual — envíos del año actual\n\n' +
       '🗑️ Eliminar:\n' +
       '/borrar — eliminar un movimiento\n\n' +
       '📝 Para registrar un movimiento escribe en lenguaje natural:\n' +
       '"gasté 20 lucas en supermercado"\n' +
       '"me transfirieron 150k de sueldo"\n' +
-      '"pagué 45.000 con tarjeta ayer"'
+      '"pagué 45.000 con tarjeta ayer"\n\n' +
+      '📦 Para registrar un envío:\n' +
+      '"envio 5 lucas ramo a maipu"\n' +
+      '"enviamos 8000 flores a santiago"'
     );
     return;
   }
@@ -199,6 +234,20 @@ async function handleCommand(chatId, userId, text) {
     return;
   }
 
+  // Resúmenes de envíos
+  const periodosEnvios = ['semanal', 'mensual', 'anual'];
+  const periodoEnvio = periodosEnvios.find((p) => text === `/envios_${p}`);
+  if (periodoEnvio) {
+    try {
+      const envios = await getEnvios();
+      const rango = getRango(periodoEnvio);
+      await sendReply(chatId, generarResumenEnvios(envios, rango.titulo, rango.desde, rango.hasta));
+    } catch {
+      await sendReply(chatId, '❌ Error al generar el resumen de envíos.');
+    }
+    return;
+  }
+
   // /borrar
   if (text === '/borrar') {
     try {
@@ -210,7 +259,6 @@ async function handleCommand(chatId, userId, text) {
 
       const ultimos3 = movimientos.slice(-3).reverse();
       conversationState.set(userId, 'borrar_seleccion');
-      // Guardamos los últimos 3 para referencia
       conversationState.set(`${userId}_borrar_lista`, ultimos3);
 
       const lista = ultimos3
