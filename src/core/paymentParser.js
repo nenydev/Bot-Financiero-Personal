@@ -23,6 +23,12 @@ const TRANSFERENCIA_KEYWORDS = [
   'deposité', 'deposite',
   'me depositaron',
   'depósito', 'deposito',
+  'tarjeta',
+  'con tarjeta',
+  'débito', 'debito',
+  'crédito', 'credito',
+  'pasé la tarjeta', 'pase la tarjeta',
+  'pasaron la tarjeta',
 ];
 
 const EFECTIVO_KEYWORDS = [
@@ -35,26 +41,25 @@ const EFECTIVO_KEYWORDS = [
   'en efectivo',
 ];
 
-const TARJETA_KEYWORDS = [
-  'tarjeta',
-  'con tarjeta',
-  'débito', 'debito',
-  'crédito', 'credito',
-  'punto de venta',
-  'punto',
+const PUNTO_KEYWORDS = [
+  'por punto',
   'por caja',
   'en caja',
-  'pasé la tarjeta', 'pase la tarjeta',
-  'pasaron la tarjeta',
+  'punto',
 ];
 
 /**
  * Detecta el medio de pago en un texto.
  * @param {string} text
- * @returns {'Transferencia'|'Efectivo'|'Tarjeta/Punto'|'No especificado'}
+ * @returns {'Transferencia'|'Efectivo'|'Punto'|null}
+ * Retorna null si no se detecta — el bot preguntará al usuario.
  */
 export function parsePayment(text) {
   const normalized = text.toLowerCase();
+
+  if (PUNTO_KEYWORDS.some((k) => normalized.includes(k))) {
+    return 'Punto';
+  }
 
   if (TRANSFERENCIA_KEYWORDS.some((k) => normalized.includes(k))) {
     return 'Transferencia';
@@ -64,9 +69,5 @@ export function parsePayment(text) {
     return 'Efectivo';
   }
 
-  if (TARJETA_KEYWORDS.some((k) => normalized.includes(k))) {
-    return 'Punto';
-  }
-
-  return 'No especificado';
+  return null;
 }

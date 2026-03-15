@@ -8,6 +8,12 @@ import { config, WHITELIST } from '../config.js';
 
 const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
+// Registro de últimos envíos para evitar duplicados
+const ultimoEnvio = {
+  semanal: null,
+  mensual: null,
+};
+
 async function enviarATodos(texto) {
   for (const userId of WHITELIST) {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -19,6 +25,17 @@ async function enviarATodos(texto) {
 }
 
 async function enviarResumen(periodo) {
+  // Evitar envío duplicado en el mismo minuto
+  const ahora = new Date();
+  const claveMinuto = `${ahora.getUTCFullYear()}-${ahora.getUTCMonth()}-${ahora.getUTCDate()}-${ahora.getUTCHours()}-${ahora.getUTCMinutes()}`;
+
+  if (ultimoEnvio[periodo] === claveMinuto) {
+    console.log(`[SCHEDULER] ⚠️ Resumen ${periodo} ya enviado en este minuto, ignorando.`);
+    return;
+  }
+
+  ultimoEnvio[periodo] = claveMinuto;
+
   try {
     const movimientos = await getMovimientos();
     const rango = getRango(periodo);
@@ -32,27 +49,26 @@ async function enviarResumen(periodo) {
 
 /**
  * Inicia el scheduler. Revisa cada minuto si hay que enviar algo.
- * Hora Chile = UTC-4 (estándar) → 9pm Chile = 1am UTC del día siguiente
+ * Domingo 9pm Chile = Lunes 1am UTC
+ * Último día del mes 9pm Chile = 1am UTC
  */
 export function startScheduler() {
   setInterval(() => {
     const ahora = new Date();
     const horaUTC = ahora.getUTCHours();
     const minUTC = ahora.getUTCMinutes();
-    const diaSemana = ahora.getUTCDay(); // 0=domingo, 1=lunes...
+    const diaSemana = ahora.getUTCDay();
     const diaDelMes = ahora.getUTCDate();
     const ultimoDia = new Date(ahora.getUTCFullYear(), ahora.getUTCMonth() + 1, 0).getUTCDate();
 
-    // Domingo 9pm Chile = Lunes 1am UTC
     if (diaSemana === 1 && horaUTC === 1 && minUTC === 0) {
       enviarResumen('semanal');
     }
 
-    // Último día del mes 9pm Chile = siguiente día 1am UTC (o mismo día si es el último)
     if (diaDelMes === ultimoDia && horaUTC === 1 && minUTC === 0) {
       enviarResumen('mensual');
     }
-  }, 60 * 1000); // cada minuto
+  }, 60 * 1000);
 
   console.log('[SCHEDULER] ✅ Scheduler iniciado');
 }

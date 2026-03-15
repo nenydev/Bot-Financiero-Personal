@@ -80,6 +80,11 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
+  if (estado?.startsWith('esperando_medio_pago:')) {
+    await handleMedioPago(chatId, userId, text, estado);
+    return;
+  }
+
   // 4. Detectar si es un envío
   if (esEnvio(text)) {
     const monto = parseAmount(text);
@@ -108,6 +113,21 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
+  // 6. Si no se detectó medio de pago, preguntar
+  if (!parsed.medioPago) {
+    conversationState.set(userId, `esperando_medio_pago:${JSON.stringify(parsed)}`);
+    await sendReply(
+      chatId,
+      `✅ Monto detectado: $${parsed.monto.toLocaleString('es-CL')} — ${parsed.tipo}\n\n` +
+      `¿Cuál fue el medio de pago?\n\n` +
+      `1️⃣ Efectivo\n` +
+      `2️⃣ Transferencia\n` +
+      `3️⃣ Punto`
+    );
+    return;
+  }
+
+  // 7. Guardar directamente si ya tiene medio de pago
   try {
     await appendMovement(parsed);
   } catch (err) {
@@ -116,7 +136,39 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  await sendReply(chatId, `✅ Movimiento registrado: ${parsed.tipo} de ${parsed.monto} el ${parsed.fecha} — ${parsed.medioPago}`);
+  await sendReply(chatId, `✅ Movimiento registrado: ${parsed.tipo} de $${parsed.monto.toLocaleString('es-CL')} el ${parsed.fecha} — ${parsed.medioPago}`);
+}
+
+async function handleMedioPago(chatId, userId, text, estado) {
+  const opciones = {
+    '1': 'Efectivo',
+    '2': 'Transferencia',
+    '3': 'Punto',
+    'efectivo': 'Efectivo',
+    'transferencia': 'Transferencia',
+    'punto': 'Punto',
+  };
+
+  const medioPago = opciones[text.toLowerCase().trim()];
+
+  if (!medioPago) {
+    await sendReply(chatId, 'Responde con 1, 2 o 3:\n\n1️⃣ Efectivo\n2️⃣ Transferencia\n3️⃣ Punto');
+    return;
+  }
+
+  const parsedJson = estado.replace('esperando_medio_pago:', '');
+  const parsed = JSON.parse(parsedJson);
+  parsed.medioPago = medioPago;
+
+  conversationState.delete(userId);
+
+  try {
+    await appendMovement(parsed);
+    await sendReply(chatId, `✅ Movimiento registrado: ${parsed.tipo} de $${parsed.monto.toLocaleString('es-CL')} el ${parsed.fecha} — ${medioPago}`);
+  } catch (err) {
+    console.error('[TELEGRAM] Error guardando movimiento:', err.message);
+    await sendReply(chatId, '❌ Error al guardar el movimiento. Intenta más tarde.');
+  }
 }
 
 async function handleCommand(chatId, userId, text) {
