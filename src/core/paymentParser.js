@@ -1,8 +1,13 @@
 // ============================================================
-// core/paymentParser.js — Detecta el medio de pago
+// core/paymentParser.js — Detecta la fuente del movimiento
+// ============================================================
+// Fuentes posibles:
+//   - Cuenta: transferencias, pagos con tarjeta, débito, crédito
+//   - Efectivo: pagos en cash
+//   - Punto: ingresos por el punto de venta del local (solo Ingresos)
 // ============================================================
 
-const TRANSFERENCIA_KEYWORDS = [
+const CUENTA_KEYWORDS = [
   'transferí', 'transferi',
   'transferencia',
   'transferido',
@@ -49,20 +54,22 @@ const PUNTO_KEYWORDS = [
 ];
 
 /**
- * Detecta el medio de pago en un texto.
+ * Detecta la fuente del movimiento en un texto.
  * @param {string} text
- * @returns {'Transferencia'|'Efectivo'|'Punto'|null}
+ * @param {string} tipo - 'Ingreso' o 'Gasto'
+ * @returns {'Cuenta'|'Efectivo'|'Punto'|null}
  * Retorna null si no se detecta — el bot preguntará al usuario.
  */
-export function parsePayment(text) {
+export function parsePayment(text, tipo) {
   const normalized = text.toLowerCase();
 
-  if (PUNTO_KEYWORDS.some((k) => normalized.includes(k))) {
+  // Punto solo aplica a Ingresos
+  if (tipo === 'Ingreso' && PUNTO_KEYWORDS.some((k) => normalized.includes(k))) {
     return 'Punto';
   }
 
-  if (TRANSFERENCIA_KEYWORDS.some((k) => normalized.includes(k))) {
-    return 'Transferencia';
+  if (CUENTA_KEYWORDS.some((k) => normalized.includes(k))) {
+    return 'Cuenta';
   }
 
   if (EFECTIVO_KEYWORDS.some((k) => normalized.includes(k))) {

@@ -116,13 +116,16 @@ export async function handleTelegramWebhook(req, res) {
   // 6. Si no se detectó medio de pago, preguntar
   if (!parsed.medioPago) {
     conversationState.set(userId, `esperando_medio_pago:${JSON.stringify(parsed)}`);
+
+    const opcionesFuente = parsed.tipo === 'Ingreso'
+      ? `1️⃣ Efectivo\n2️⃣ Cuenta\n3️⃣ Punto`
+      : `1️⃣ Efectivo\n2️⃣ Cuenta`;
+
     await sendReply(
       chatId,
       `✅ Monto detectado: $${parsed.monto.toLocaleString('es-CL')} — ${parsed.tipo}\n\n` +
-      `¿Cuál fue el medio de pago?\n\n` +
-      `1️⃣ Efectivo\n` +
-      `2️⃣ Transferencia\n` +
-      `3️⃣ Punto`
+      `¿Cuál es la fuente del movimiento?\n\n` +
+      opcionesFuente
     );
     return;
   }
@@ -140,31 +143,29 @@ export async function handleTelegramWebhook(req, res) {
 }
 
 async function handleMedioPago(chatId, userId, text, estado) {
-  const opciones = {
-    '1': 'Efectivo',
-    '2': 'Transferencia',
-    '3': 'Punto',
-    'efectivo': 'Efectivo',
-    'transferencia': 'Transferencia',
-    'punto': 'Punto',
-  };
+  const parsedJson = estado.replace('esperando_medio_pago:', '');
+  const parsed = JSON.parse(parsedJson);
 
-  const medioPago = opciones[text.toLowerCase().trim()];
+  const opciones = parsed.tipo === 'Ingreso'
+    ? { '1': 'Efectivo', '2': 'Cuenta', '3': 'Punto', 'efectivo': 'Efectivo', 'cuenta': 'Cuenta', 'punto': 'Punto' }
+    : { '1': 'Efectivo', '2': 'Cuenta', 'efectivo': 'Efectivo', 'cuenta': 'Cuenta' };
 
-  if (!medioPago) {
-    await sendReply(chatId, 'Responde con 1, 2 o 3:\n\n1️⃣ Efectivo\n2️⃣ Transferencia\n3️⃣ Punto');
+  const fuente = opciones[text.toLowerCase().trim()];
+
+  if (!fuente) {
+    const instruccion = parsed.tipo === 'Ingreso'
+      ? 'Responde con 1, 2 o 3:\n\n1️⃣ Efectivo\n2️⃣ Cuenta\n3️⃣ Punto'
+      : 'Responde con 1 o 2:\n\n1️⃣ Efectivo\n2️⃣ Cuenta';
+    await sendReply(chatId, instruccion);
     return;
   }
 
-  const parsedJson = estado.replace('esperando_medio_pago:', '');
-  const parsed = JSON.parse(parsedJson);
-  parsed.medioPago = medioPago;
-
+  parsed.medioPago = fuente;
   conversationState.delete(userId);
 
   try {
     await appendMovement(parsed);
-    await sendReply(chatId, `✅ Movimiento registrado: ${parsed.tipo} de $${parsed.monto.toLocaleString('es-CL')} el ${parsed.fecha} — ${medioPago}`);
+    await sendReply(chatId, `✅ Movimiento registrado: ${parsed.tipo} de $${parsed.monto.toLocaleString('es-CL')} el ${parsed.fecha} — ${fuente}`);
   } catch (err) {
     console.error('[TELEGRAM] Error guardando movimiento:', err.message);
     await sendReply(chatId, '❌ Error al guardar el movimiento. Intenta más tarde.');
