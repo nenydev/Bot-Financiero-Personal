@@ -7,7 +7,8 @@ import { WHITELIST, config } from '../config.js';
 import { parseMessage } from '../core/parser.js';
 import { esEnvio } from '../core/envioParser.js';
 import { parseAmount } from '../core/amountParser.js';
-import { parseDate, formatDate } from '../core/dateParser.js';
+import { parseDate } from '../core/dateParser.js';
+import { generarYEnviarReporte } from '../services/scheduler.js';
 import {
   appendMovement,
   getMovimientos,
@@ -113,7 +114,7 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  // 6. Si no se detectó medio de pago, preguntar
+  // 6. Si no se detectó fuente, preguntar
   if (!parsed.medioPago) {
     conversationState.set(userId, `esperando_medio_pago:${JSON.stringify(parsed)}`);
 
@@ -130,7 +131,7 @@ export async function handleTelegramWebhook(req, res) {
     return;
   }
 
-  // 7. Guardar directamente si ya tiene medio de pago
+  // 7. Guardar directamente si ya tiene fuente
   try {
     await appendMovement(parsed);
   } catch (err) {
@@ -194,6 +195,8 @@ async function handleCommand(chatId, userId, text) {
       '/envios_semanal — envíos de los últimos 7 días\n' +
       '/envios_mensual — envíos del mes actual\n' +
       '/envios_anual — envíos del año actual\n\n' +
+      '📄 Reportes:\n' +
+      '/reporte — genera y envía el reporte PDF del mes actual\n\n' +
       '🗑️ Eliminar:\n' +
       '/borrar — eliminar un movimiento\n\n' +
       '📝 Para registrar un movimiento escribe en lenguaje natural:\n' +
@@ -254,7 +257,7 @@ async function handleCommand(chatId, userId, text) {
         `📋 Último movimiento:\n\n` +
         `• ${ultimo.fecha.replace("'", '')} — ${ultimo.tipo} $${ultimo.monto.toLocaleString('es-CL')}\n` +
         `  ${ultimo.detalle}\n` +
-        `  Medio de pago: ${ultimo.medioPago}`
+        `  Fuente: ${ultimo.medioPago}`
       );
     } catch {
       await sendReply(chatId, '❌ Error al obtener el último movimiento.');
@@ -297,6 +300,19 @@ async function handleCommand(chatId, userId, text) {
       await sendReply(chatId, generarResumenEnvios(envios, rango.titulo, rango.desde, rango.hasta));
     } catch {
       await sendReply(chatId, '❌ Error al generar el resumen de envíos.');
+    }
+    return;
+  }
+
+  // /reporte
+  if (text === '/reporte') {
+    await sendReply(chatId, '⏳ Generando reporte, esto puede tardar unos segundos...');
+    try {
+      await generarYEnviarReporte();
+      await sendReply(chatId, '✅ Reporte enviado por Telegram y email.');
+    } catch (err) {
+      console.error('[TELEGRAM] Error generando reporte:', err.message);
+      await sendReply(chatId, '❌ Error al generar el reporte.');
     }
     return;
   }
