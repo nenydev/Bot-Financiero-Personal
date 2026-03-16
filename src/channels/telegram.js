@@ -322,11 +322,15 @@ async function handleCommand(chatId, userId, text) {
   if (text === '/reporte') {
     await sendReply(chatId, '⏳ Generando reporte, esto puede tardar unos segundos...');
     try {
+      console.log('[REPORTE] Llamando a generarPDFBuffer...');
       const { pdfBuffer, mes } = await generarPDFBuffer();
+      console.log('[REPORTE] PDF generado, tamaño:', pdfBuffer.length);
       await sendDocument(chatId, pdfBuffer, mes);
+      console.log('[REPORTE] Documento enviado');
       await sendReply(chatId, '✅ Reporte enviado.');
     } catch (err) {
-      console.error('[TELEGRAM] Error generando reporte:', err.message);
+      console.error('[REPORTE] Error:', err.message);
+      console.error('[REPORTE] Stack:', err.stack);
       await sendReply(chatId, '❌ Error al generar el reporte.');
     }
     return;
