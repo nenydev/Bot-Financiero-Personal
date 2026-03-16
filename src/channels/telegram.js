@@ -3,12 +3,13 @@
  * Responsabilidad: manejar la comunicación con la API de Telegram.
  */
 
-import { WHITELIST, config } from '../config.js';
+import { WHITELIST, config, getUsuario } from '../config.js';
 import { parseMessage } from '../core/parser.js';
 import { esEnvio } from '../core/envioParser.js';
 import { parseAmount } from '../core/amountParser.js';
 import { parseDate } from '../core/dateParser.js';
-import { generarYEnviarReporte } from '../services/scheduler.js';
+import { generarYEnviarReporte, generarPDFBuffer } from '../services/scheduler.js';
+import { enviarReportePorEmail } from '../services/mailer.js';
 import {
   appendMovement,
   getMovimientos,
@@ -41,6 +42,18 @@ async function sendReply(chatId, text) {
   }
 }
 
+async function sendDocument(chatId, pdfBuffer, mes) {
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+  formData.append('caption', `📄 Reporte mensual — ${mes}`);
+  formData.append('document', new Blob([pdfBuffer], { type: 'application/pdf' }), `reporte-${mes}.pdf`);
+
+  await fetch(`${TELEGRAM_API}/sendDocument`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export async function handleTelegramWebhook(req, res) {
   res.sendStatus(200);
 
@@ -56,7 +69,7 @@ export async function handleTelegramWebhook(req, res) {
   console.log(`[TELEGRAM] Mensaje de ${username} (${userId}): "${text}"`);
 
   // 1. Validar whitelist
-  if (!WHITELIST.includes(userId)) {
+  if (!WHITELIST.some((u) => u.id === userId)) {
     console.warn(`[TELEGRAM] ⛔ Usuario no autorizado: ${userId}`);
     await sendReply(chatId, '⛔ No estás autorizado para usar este bot.');
     return;
@@ -196,7 +209,8 @@ async function handleCommand(chatId, userId, text) {
       '/envios_mensual — envíos del mes actual\n' +
       '/envios_anual — envíos del año actual\n\n' +
       '📄 Reportes:\n' +
-      '/reporte — genera y envía el reporte PDF del mes actual\n\n' +
+      '/reporte — recibe el PDF del mes por Telegram\n' +
+      '/reporte_email — recibe el PDF del mes en tu correo\n\n' +
       '🗑️ Eliminar:\n' +
       '/borrar — eliminar un movimiento\n\n' +
       '📝 Para registrar un movimiento escribe en lenguaje natural:\n' +
@@ -304,15 +318,35 @@ async function handleCommand(chatId, userId, text) {
     return;
   }
 
-  // /reporte
+  // /reporte — envía PDF solo por Telegram al usuario que lo pidió
   if (text === '/reporte') {
     await sendReply(chatId, '⏳ Generando reporte, esto puede tardar unos segundos...');
     try {
-      await generarYEnviarReporte();
-      await sendReply(chatId, '✅ Reporte enviado por Telegram y email.');
+      const { pdfBuffer, mes } = await generarPDFBuffer();
+      await sendDocument(chatId, pdfBuffer, mes);
+      await sendReply(chatId, '✅ Reporte enviado.');
     } catch (err) {
       console.error('[TELEGRAM] Error generando reporte:', err.message);
       await sendReply(chatId, '❌ Error al generar el reporte.');
+    }
+    return;
+  }
+
+  // /reporte_email — envía PDF al correo del usuario que lo pidió
+  if (text === '/reporte_email') {
+    const usuario = getUsuario(userId);
+    if (!usuario?.email) {
+      await sendReply(chatId, '❌ No tienes un email configurado. Contacta al administrador.');
+      return;
+    }
+    await sendReply(chatId, '⏳ Generando reporte, esto puede tardar unos segundos...');
+    try {
+      const { pdfBuffer, mes } = await generarPDFBuffer();
+      await enviarReportePorEmail(pdfBuffer, mes, [usuario.email]);
+      await sendReply(chatId, `✅ Reporte enviado a ${usuario.email}.`);
+    } catch (err) {
+      console.error('[TELEGRAM] Error enviando reporte por email:', err.message);
+      await sendReply(chatId, '❌ Error al enviar el reporte por email.');
     }
     return;
   }
