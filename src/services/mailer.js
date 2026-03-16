@@ -1,17 +1,19 @@
 // ============================================================
-// services/mailer.js — Envía el reporte PDF por email via Resend
+// services/mailer.js — Envía el reporte PDF por email via Gmail
 // ============================================================
 
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
-/**
- * Envía el reporte mensual PDF por email.
- * @param {Buffer} pdfBuffer
- * @param {string} mes
- * @param {string[]} destinatariosExtra - Si se pasa, usa estos en lugar de GMAIL_RECIPIENTS
- */
 export async function enviarReportePorEmail(pdfBuffer, mes, destinatariosExtra = []) {
   const destinatarios = destinatariosExtra.length > 0
     ? destinatariosExtra
@@ -22,15 +24,16 @@ export async function enviarReportePorEmail(pdfBuffer, mes, destinatariosExtra =
     return;
   }
 
-  await resend.emails.send({
-    from: 'Bot Financiero <onboarding@resend.dev>',
-    to: destinatarios,
+  await transporter.sendMail({
+    from: `"Bot Financiero" <${process.env.GMAIL_USER}>`,
+    to: destinatarios.join(', '),
     subject: `Reporte Financiero — ${mes}`,
     text: `Adjunto encontrarás el reporte financiero del mes de ${mes}.`,
     attachments: [
       {
         filename: `reporte-${mes.toLowerCase().replace(' ', '-')}.pdf`,
         content: pdfBuffer,
+        contentType: 'application/pdf',
       },
     ],
   });
