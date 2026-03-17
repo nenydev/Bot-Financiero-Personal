@@ -22,7 +22,7 @@ function crearMensajeBase64(destinatarios, remitente, asunto, texto, pdfBuffer, 
   const mensaje = [
     `From: "Bot Financiero" <${remitente}>`,
     `To: ${destinatarios.join(', ')}`,
-    `Subject: ${asunto}`,
+    `Subject: =?UTF-8?B?${Buffer.from(asunto).toString('base64')}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     ``,
