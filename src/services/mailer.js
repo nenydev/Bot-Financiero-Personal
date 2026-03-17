@@ -1,19 +1,48 @@
 // ============================================================
-// services/mailer.js — Envía el reporte PDF por email via Gmail OAuth2
+// services/mailer.js — Envía email via Gmail API (HTTP, sin SMTP)
 // ============================================================
 
-import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    type: 'OAuth2',
-    user: process.env.GMAIL_USER,
-    clientId: process.env.GMAIL_CLIENT_ID,
-    clientSecret: process.env.GMAIL_CLIENT_SECRET,
-    refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-  },
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GMAIL_CLIENT_ID,
+  process.env.GMAIL_CLIENT_SECRET,
+  'https://developers.google.com/oauthplayground'
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.GMAIL_REFRESH_TOKEN,
 });
+
+const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+function crearMensajeBase64(destinatarios, remitente, asunto, texto, pdfBuffer, nombreArchivo) {
+  const boundary = 'boundary_bot_financiero';
+
+  const mensaje = [
+    `From: "Bot Financiero" <${remitente}>`,
+    `To: ${destinatarios.join(', ')}`,
+    `Subject: ${asunto}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset="UTF-8"`,
+    ``,
+    texto,
+    ``,
+    `--${boundary}`,
+    `Content-Type: application/pdf; name="${nombreArchivo}"`,
+    `Content-Disposition: attachment; filename="${nombreArchivo}"`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    pdfBuffer.toString('base64'),
+    ``,
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  return Buffer.from(mensaje).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 export async function enviarReportePorEmail(pdfBuffer, mes, destinatariosExtra = []) {
   const destinatarios = destinatariosExtra.length > 0
@@ -25,18 +54,22 @@ export async function enviarReportePorEmail(pdfBuffer, mes, destinatariosExtra =
     return;
   }
 
-  await transporter.sendMail({
-    from: `"Bot Financiero" <${process.env.GMAIL_USER}>`,
-    to: destinatarios.join(', '),
-    subject: `Reporte Financiero — ${mes}`,
-    text: `Adjunto encontrarás el reporte financiero del mes de ${mes}.`,
-    attachments: [
-      {
-        filename: `reporte-${mes.toLowerCase().replace(' ', '-')}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf',
-      },
-    ],
+  const nombreArchivo = `reporte-${mes.toLowerCase().replace(' ', '-')}.pdf`;
+  const asunto = `Reporte Financiero — ${mes}`;
+  const texto = `Adjunto encontrarás el reporte financiero del mes de ${mes}.`;
+
+  const raw = crearMensajeBase64(
+    destinatarios,
+    process.env.GMAIL_USER,
+    asunto,
+    texto,
+    pdfBuffer,
+    nombreArchivo
+  );
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
   });
 
   console.log(`[MAILER] ✅ Reporte enviado a: ${destinatarios.join(', ')}`);
