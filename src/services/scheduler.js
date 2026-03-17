@@ -43,14 +43,14 @@ async function enviarDocumentATodos(pdfBuffer, mes) {
 
 async function enviarResumen(periodo) {
   const ahora = new Date();
-  const claveMinuto = `${ahora.getUTCFullYear()}-${ahora.getUTCMonth()}-${ahora.getUTCDate()}-${ahora.getUTCHours()}-${ahora.getUTCMinutes()}`;
+  const claveHora = `${ahora.getUTCFullYear()}-${ahora.getUTCMonth()}-${ahora.getUTCDate()}-${ahora.getUTCHours()}`;
 
-  if (ultimoEnvio[periodo] === claveMinuto) {
-    console.log(`[SCHEDULER] ⚠️ Resumen ${periodo} ya enviado en este minuto, ignorando.`);
+  if (ultimoEnvio[periodo] === claveHora) {
+    console.log(`[SCHEDULER] ⚠️ Resumen ${periodo} ya enviado en esta hora, ignorando.`);
     return;
   }
 
-  ultimoEnvio[periodo] = claveMinuto;
+  ultimoEnvio[periodo] = claveHora;
 
   try {
     const movimientos = await getMovimientos();
@@ -94,14 +94,14 @@ export async function generarPDFBuffer() {
 
 async function enviarReportePDF() {
   const ahora = new Date();
-  const claveMinuto = `${ahora.getUTCFullYear()}-${ahora.getUTCMonth()}-${ahora.getUTCDate()}-${ahora.getUTCHours()}-${ahora.getUTCMinutes()}`;
+  const claveHora = `${ahora.getUTCFullYear()}-${ahora.getUTCMonth()}-${ahora.getUTCDate()}-${ahora.getUTCHours()}`;
 
-  if (ultimoEnvio.pdf === claveMinuto) {
-    console.log('[SCHEDULER] ⚠️ PDF ya enviado en este minuto, ignorando.');
+  if (ultimoEnvio.pdf === claveHora) {
+    console.log('[SCHEDULER] ⚠️ PDF ya enviado en esta hora, ignorando.');
     return;
   }
 
-  ultimoEnvio.pdf = claveMinuto;
+  ultimoEnvio.pdf = claveHora;
 
   try {
     const { pdfBuffer, mes } = await generarPDFBuffer();
