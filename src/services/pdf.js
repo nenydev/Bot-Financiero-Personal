@@ -134,7 +134,7 @@ function formatMonto(n) {
 
 function dibujarTitulo(doc, texto, color, W) {
   doc.fontSize(11).font('Helvetica-Bold').fillColor(color)
-    .text(texto, { underline: false });
+    .text(texto, 40, doc.y, { width: W, align: 'left' });
   doc.moveDown(0.3);
 }
 
