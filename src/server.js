@@ -35,15 +35,7 @@ app.get('/', (req, res) => {
 
 //ping para monitoreo externo (ej: UptimeRobot)
 app.get('/ping', (req, res) => {
-  const ahora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
-  const hora = ahora.getHours();
-
-  // Activo de 8am a 00am (medianoche)
-  if (hora >= 8 && hora < 24) {
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(503);
-  }
+  res.sendStatus(200);
 });
 
 // Webhook de Telegram
