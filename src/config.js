@@ -14,6 +14,8 @@ import 'dotenv/config';
 export const WHITELIST = [
   { id: 5966834377, nombre: 'Henry', email: 'nenydev@gmail.com' },
   { id: 8368683187, nombre: 'Andres', email: 'almirante2004@gmail.com' },
+  { id: 8488722233, nombre: 'Kiara', email: 'beniteskiara2@gmail.com' },
+
 ];
 
 export const config = {
