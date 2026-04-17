@@ -9,6 +9,13 @@
 
 const CUENTA_KEYWORDS = [
   'transferí', 'transferi',
+  'tranferencia',
+  'trasferencia',
+  'transferi',
+  'tranferi',
+  'trasferi',
+  'transferí',
+  'tranferí',
   'transferencia',
   'transferido',
   'me transfirieron', 'nos transfirieron',
